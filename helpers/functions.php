@@ -5930,6 +5930,25 @@ if (!function_exists('is_cli'))
 }
 
 
+if (!function_exists('add_filter'))
+{
+    function add_filter($name, $callback, $priority = 100)
+    {
+        return Quantum\TextFiltersHandler::getInstance()->addFilter($name, $callback, $priority);
+    }
+}
+
+if (!function_exists('apply_filter'))
+{
+    function apply_filter($event_key, $data)
+    {
+        $args = func_get_args();
+
+        return call_user_func_array([Quantum\TextFiltersHandler::getInstance(), 'applyFilter'], $args);
+    }
+}
+
+
 
 
 

@@ -324,17 +324,6 @@ class CurlRequest
         // Output the header in the response.
         curl_setopt($ch, CURLOPT_HEADER, TRUE);
 
-        if (class_exists('NetworkTransaction')) //For Unit Testing (CurlRequestTest)
-        {
-            $transaction = new \NetworkTransaction();
-            $transaction->url = $this->address;
-            $transaction->request = serialize($this);
-            $transaction->post_params = $this->postFields;
-            $transaction->method = empty($this->requestType) ? "GET" : $this->requestType;
-            $transaction->start_timestamp = microtime(true);
-            $transaction->save();
-        }
-
         $response = curl_exec($ch);
 
         $error = curl_error($ch);
@@ -351,22 +340,6 @@ class CurlRequest
 
         // Convert the latency to ms.
         $this->latency = round($time * 1000);
-
-        if (class_exists('NetworkTransaction'))
-        {
-            $transaction->response = $this->responseBody;
-            $transaction->headers = $this->responseHeader;
-            $transaction->error = $this->error;
-            $transaction->http_code = $this->httpCode;
-            $transaction->end_timestamp = microtime(true);
-            $transaction->recorded_time = $time;
-            $transaction->latency = $this->latency;
-            $transaction->save();
-
-            $this->transaction = $transaction;
-        }
-
-
     }
 
     function getTransaction ()

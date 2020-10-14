@@ -77,6 +77,13 @@ class EventsManager extends Singleton
     }
 
 
+    /**
+     * @param $event_key
+     * @param null $data
+     * @param false $failedIfNotFound
+     * @return mixed
+     * @throws EventDispatchException
+     */
     public function dispatch($event_key, $data = null, $failedIfNotFound = false)
     {
         $event = $this->events->get($event_key, null);
@@ -119,6 +126,16 @@ class EventsManager extends Singleton
     public function detach($event_key, $listener)
     {
         $this->getEvent($event_key)->detach($listener);
+    }
+
+
+    /**
+     * @param $event_key
+     * @return bool
+     */
+    public function hasEvent($event_key)
+    {
+        return $this->events->has($event_key);
     }
 
 

@@ -48,6 +48,11 @@ class Event
             $this->name = $name;
     }
 
+    public function __toString()
+    {
+        return $this->data;
+    }
+
 
     public function add($callback, $priority, $callOnlyOnce)
     {
@@ -122,6 +127,11 @@ class Event
         }
 
         return false;
+    }
+
+    public function getObservers()
+    {
+        return $this->observers;
     }
 }
 
