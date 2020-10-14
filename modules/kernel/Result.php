@@ -17,43 +17,44 @@ class Result
     private $success;
 
     /**
+     * @var
+     */
+    public $data;
+
+    /**
      * Result constructor.
      * @param $success
      * @param string $message
      */
-    public function __construct($success, $message = "")
+    public function __construct($success, $message = "", $data = null)
     {
         $this->success = $success;
+        $this->data = $data;
 
-        if (!$this->success)
+        if (!empty($message))
         {
-            if (!empty($message))
-                $this->message = $message;
-            else
-                $this->message = "Unknown Error";
+            $this->message = $message;
         }
+        else
+        {
+            if (!$this->success)
+                $this->message = 'Unknown Error';
+        }
+
     }
 
-    /**
-     * Creates and returns a 'successful' result.
-     * @return Result
-     */
-    public static function ok()
+
+    public static function ok($message = '', $data = null)
     {
-        $r = new Result(true);
+        $r = new Result(true, $message, $data);
 
         return $r;
     }
 
-    /**
-     * Creates a 'failure' result.
-     * If you pass a blank error message in here, a default "Unknown Error" message will be used instead.
-     * @param string $message
-     * @return Result
-     */
-    public static function fail($message = "")
+
+    public static function fail($message = '', $data = null)
     {
-        $r = new Result(false, $message);
+        $r = new Result(false, $message, $data);
 
         return $r;
     }
@@ -78,12 +79,22 @@ class Result
 
     /**
      * Returns the error message that was set when this result was created.
-     * For a successful result, this will be an empty string;
+     * For a successful result, this may be an empty string;
      * @return string
      */
     public function getErrorMessage()
     {
         return $this->message;
+    }
+
+    /**
+     * Returns the data that was set when this result was created
+     * this may be null;
+     * @return string
+     */
+    public function getData()
+    {
+        return $this->data;
     }
 
 }

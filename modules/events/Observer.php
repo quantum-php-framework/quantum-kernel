@@ -183,6 +183,12 @@ class Observer
         return $this->_callbackHash;
     }
 
+    public function getNumCallableArguments()
+    {
+        $reflector = $this->getCallableReflection($this->_callback);
+        return $reflector->getNumberOfParameters();
+    }
+
     /**
      * @param $callback
      * @return string

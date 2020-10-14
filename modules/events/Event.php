@@ -133,5 +133,10 @@ class Event
     {
         return $this->observers;
     }
+
+    public function clearObservers()
+    {
+        return $this->observers->clear();
+    }
 }
 

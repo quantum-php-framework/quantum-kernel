@@ -3,6 +3,7 @@
 namespace Quantum\Streams;
 
 use Quantum\File;
+use Quantum\Result;
 use Quantum\URL;
 
 /**
@@ -39,11 +40,13 @@ class FileDownloadStream
 
         if ($return === false)
         {
-            return curl_error($ch);
+            $error = curl_error($ch);
+
+            return Result::fail($error);
         }
         else
         {
-            return true;
+            return Result::ok();
         }
     }
 

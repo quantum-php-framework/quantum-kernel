@@ -44,7 +44,7 @@ class TextFiltersHandler extends Singleton
             $this->events->set($name, $event);
         }
 
-        $event->add($callback, $priority, false);
+        $event->add($callback, $priority, true);
     }
 
 
@@ -71,31 +71,28 @@ class TextFiltersHandler extends Singleton
             usort($observers, function($first, $second){
                 return $first->_priority > $second->_priority;
             });
-            //
 
             foreach ($observers as $observer)
             {
-                $args[0] = $value;
-
                 $callable = $observer->_callback;
 
-                $reflector = $observer->getCallableReflection($callable);
-                $accepted_params_count = $reflector->getNumberOfParameters();
+                $accepted_params_count = $observer->getNumCallableArguments();
 
                 if ($accepted_params_count == 0) {
-                    $value = call_user_func( $callable );
+                    $args[0] = call_user_func( $callable );
                 }
                 elseif ($accepted_params_count >= $num_args) {
-                    $value = call_user_func_array($callable, $args );
+                    $args[0] = call_user_func_array($callable, $args );
                 }
                 else {
-                    $value = call_user_func_array($callable, array_slice( $args, 0, (int) $accepted_params_count ) );
+                    $args[0] = call_user_func_array($callable, array_slice( $args, 0, (int) $accepted_params_count ) );
                 }
-
             }
+
+            $event->clearObservers();
         }
 
-        return $value;
+        return $args[0];
     }
 
 
