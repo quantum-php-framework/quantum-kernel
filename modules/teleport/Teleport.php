@@ -1064,11 +1064,19 @@ class Teleport {
 
     private function updateKernel()
     {
-        $updater = new Quantum\Updater();
+        $updater = new Updater();
 
         $result = $updater->updateKernel();
 
-        cli_echo($result->getMessage());
+        if ($result->wasOk())
+        {
+            cli_echo('success, kernel updated!');
+        }
+        else {
+            cli_echo('Error');
+            cli_echo($result->getErrorMessage());
+        }
+
     }
 
 
