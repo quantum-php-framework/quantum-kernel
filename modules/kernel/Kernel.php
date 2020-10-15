@@ -41,7 +41,7 @@ include ("QM.php");
  * The Quantum Kernel
  * Format: Maj.Min.Min.Rev
  */
-define("QM_KERNEL_VERSION", "2.6.9.5");
+define("QM_KERNEL_VERSION", "2.7.0.0");
 
 
 /**

@@ -185,6 +185,10 @@ class Teleport {
                 $this->updateKernel();
                 break;
 
+            case "check-kernel-update":
+                $this->kernelUpdateCheck();
+                break;
+
             case "-c":
                 $this->teleportController();
                 break;
@@ -1070,13 +1074,30 @@ class Teleport {
 
         if ($result->wasOk())
         {
-            cli_echo('success, kernel updated!');
+            $release = $updater->getLatestRelease();
+            cli_echo('Success, kernel updated to version: '.$release->tag_name);
         }
         else {
             cli_echo('Error');
             cli_echo($result->getErrorMessage());
         }
 
+    }
+
+    private function kernelUpdateCheck()
+    {
+        $updater = new Updater();
+
+        $result = $updater->isKernelUpdateAvailable();
+
+        if ($result)
+        {
+            $release = $updater->getLatestRelease();
+            cli_echo('Version update avaiable:'.$release->tag_name);
+        }
+        else {
+            cli_echo('It seems you are on the latest version.');
+        }
     }
 
 
