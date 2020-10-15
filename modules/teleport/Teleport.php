@@ -1093,7 +1093,7 @@ class Teleport {
         if ($result)
         {
             $release = $updater->getLatestRelease();
-            cli_echo('Version update avaiable:'.$release->tag_name);
+            cli_echo('Version update avaiable: '.$release->tag_name);
         }
         else {
             cli_echo('It seems you are on the latest version.');

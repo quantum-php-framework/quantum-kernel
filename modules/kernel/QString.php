@@ -2179,7 +2179,7 @@ class QString implements Countable, IteratorAggregate, ArrayAccess
         $title = preg_replace('![^'.preg_quote($separator).'\pL\pN\s]+!u', '', mb_strtolower($title));
         // Replace all separator characters and whitespace by a single separator
         $title = preg_replace('!['.preg_quote($separator).'\s]+!u', $separator, $title);
-        return trim($title, $separator);
+        return static::create(trim($title, $separator));
     }
 
     /**
