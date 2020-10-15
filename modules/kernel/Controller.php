@@ -5,8 +5,6 @@
 
 namespace Quantum;
 
-use Quantum\Psr7\ResponseFactory;
-
 /**
  * Class Controller
  * @package Quantum
@@ -394,14 +392,36 @@ class Controller
         return \Quantum\Crypto::encryptWithLocalKey(\QM::session()->get('csrf'));
     }
 
-    public function isSubmoduleController()
-    {
-
-    }
-
     public function responseFactory()
     {
         return new \Quantum\Psr7\ResponseFactory();
+    }
+
+    public function getQubitQueue()
+    {
+        return $this->getParentApp()->getQubitQueue();
+    }
+
+    public function qubitCleanCache($key = null)
+    {
+        $opts = array();
+
+        if ($key)
+        {
+            $opts['task'] = 'flush_key';
+            $opts['key'] = $key;
+        }
+        else
+        {
+            $opts['task'] = 'flush_all';
+        }
+
+        return $this->qubitAddTask('CacheCleanupWorker', $opts);
+    }
+
+    public function qubitAddTask($worker, $opts)
+    {
+        return $this->getQubitQueue()->addTask($worker, $opts);
     }
 
 

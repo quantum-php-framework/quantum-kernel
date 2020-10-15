@@ -251,7 +251,6 @@ class Profiler
         $out .= '</pre>';
         */
         $out .= '</div>';
-        //$out .= '<pre>'.var_dump(get_included_files()).'</pre>';
         return $out;
     }
 }

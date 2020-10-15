@@ -22,9 +22,7 @@ class Paginator
      */
     function __construct($system_url, $items_count)
     {
-        $this->total_items_count = $items_count;
-
-	    $this->setPaginationVars();
+        $this->setPaginationVars();
 
 	    $this->setup($system_url, $items_count);
     }
@@ -36,6 +34,8 @@ class Paginator
      */
     function setup($system_url, $items_count)
     {
+        $this->total_items_count = $items_count;
+
         Import::library('pagination/paginator_qsa.class.php');
 
         $this->paginator = new \Paginator;

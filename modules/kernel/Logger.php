@@ -94,11 +94,29 @@ class Logger extends Singleton
      * @param int $level
      * @throws \Exception
      */
-    public static function custom($message, $filename, $level = Monolog\Logger::DEBUG)
+    public static function custom($message, $filename, $level = Monolog\Logger::DEBUG, $data = array())
     {
         $monolog = self::createMonolog($filename, $level);
 
-        $monolog->info(self::getCaller()." : ".$message);
+        switch ($level)
+        {
+            case Monolog\Logger::CRITICAL:
+                $monolog->critical(self::getCaller()." : ".$message, $data);
+                break;
+
+            case Monolog\Logger::ERROR:
+                $monolog->error(self::getCaller()." : ".$message, $data);
+                break;
+
+            case Monolog\Logger::DEBUG:
+                $monolog->debug(self::getCaller()." : ".$message, $data);
+                break;
+
+            default:
+                $monolog->addRecord($level, $message, $data);
+                break;
+        }
+
     }
 
 

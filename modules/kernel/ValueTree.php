@@ -53,7 +53,7 @@ class ValueTree implements ArrayAccess, Countable, IteratorAggregate
     /**
      * @param $propertyName
      * @param $value
-     * @return bool
+     * @return bool|ValueTree
      */
     public function set($propertyName, $value)
     {
@@ -65,7 +65,7 @@ class ValueTree implements ArrayAccess, Countable, IteratorAggregate
             $this->_properties[$propertyName] = $value;
             $this->runCallbacks();
 
-            return true;
+            return $this;
         }
 
         return false;
@@ -330,6 +330,7 @@ class ValueTree implements ArrayAccess, Countable, IteratorAggregate
      */
     public function __call($method, $args)
     {
+        $result = '';
         $key = strtolower(preg_replace('/(.)([A-Z])/', "$1_$2", substr($method, 3)));
         switch (substr($method, 0, 3)) {
             case 'get':
@@ -789,6 +790,7 @@ class ValueTree implements ArrayAccess, Countable, IteratorAggregate
     public function makeMutable()
     {
         $this->setUnmutable(false);
+        $this->unlock();
         return $this;
     }
 

@@ -11,7 +11,7 @@ use Quantum\KernelSupport\MobileDetector;
 /**
  * Contains method for accessing the client
  *
-*/
+ */
 class Client extends Singleton
 {
 
@@ -70,7 +70,7 @@ class Client extends Singleton
         return $this->detector;
     }
 
-    
-    
-    
+
+
+
 }

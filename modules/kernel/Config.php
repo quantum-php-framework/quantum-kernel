@@ -82,13 +82,11 @@ class Config extends Singleton
 
             }
 
-            if (is_object($current_env))
-            {
+            if (is_object($current_env)) {
                 $this->setEnvironment($current_env);
             }
-            else if (!Request::getInstance()->isCommandLine())
-            {
-                $this->setEnvironment((object)$QUANTUM_ENVIRONMENTS[0]);
+            else if (!Request::getInstance()->isCommandLine()) {
+                Output::getInstance()->displaySystemError('500');
             }
         }
 
@@ -974,7 +972,3 @@ class Config extends Singleton
 
 
 }
-
-
-
-?>

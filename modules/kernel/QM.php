@@ -102,7 +102,7 @@ class QM
      */
     static function request()
     {
-        return \Quantum\Kernel::getInstance()->request;
+        return \Quantum\Request::getInstance();
     }
 
     /**
@@ -263,6 +263,13 @@ class QM
         return Quantum\Cache\Memcache::getInstance();
     }
 
+    /**
+     * @return Quantum\AppResourcesManager
+     */
+    static function appResourcesManager()
+    {
+        return \Quantum\AppResourcesManager::getInstance();
+    }
 
 
 }

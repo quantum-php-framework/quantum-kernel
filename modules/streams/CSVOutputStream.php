@@ -50,7 +50,7 @@ class CSVOutputStream
             fputcsv($csv, $datum);
        }
 
-        if (Utilities::getExtension($filename) != "csv")
+        if (\Utilities::getExtension($filename) != "csv")
             $filename .= '.csv';
 
         if ($rewind_data)

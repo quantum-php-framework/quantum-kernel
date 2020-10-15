@@ -65,16 +65,11 @@ class ValidateCSRF extends Foundation\SystemMiddleware
         if (!$request->isPost())
             return;
 
+        if (!current_route_has('csrf_check_enabled'))
+            return;
+
         if (!$request->hasPostParam("csrf"))
         {
-            $route = \QM::config()->getCurrentRoute();
-
-            if (!empty($route))
-            {
-                if ($route['csrf_check_enabled'] == false)
-                    return;
-            }
-
             \ExternalErrorLoggerService::error("missing_csrf", "Missing CSRF Token from POST Request, URI :".$request->getUri());
 
             \Quantum\ApiException::custom("missing_csrf", "400 Bad Request", "Missing CSRF Token from POST Request, URI :".$request->getUri());

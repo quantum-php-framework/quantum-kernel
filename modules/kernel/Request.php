@@ -7,7 +7,7 @@ namespace Quantum;
 use Quantum\Middleware\ValidatePostSize;
 use Quantum\Psr7\ServerRequestFactory;
 
-require_once("Singleton.php");
+require_once ("Singleton.php");
 require_once ("Security.php");
 require_once ("Utilities.php");
 
@@ -48,6 +48,11 @@ class Request extends Singleton
      * @var
      */
     public $validation_errors_post;
+
+    private $visitor_fingerprint;
+
+
+    private $normalized_headers;
 
 
     /**
@@ -141,22 +146,6 @@ class Request extends Singleton
     /**
      * @return bool
      */
-    public function isDelete()
-    {
-        return ($_SERVER['REQUEST_METHOD'] === 'DELETE');
-    }
-
-    /**
-     * @return bool
-     */
-    public function isPatch()
-    {
-        return ($_SERVER['REQUEST_METHOD'] === 'PATCH');
-    }
-
-    /**
-     * @return bool
-     */
     public function isHead()
     {
         return ($_SERVER['REQUEST_METHOD'] === 'HEAD');
@@ -165,9 +154,9 @@ class Request extends Singleton
     /**
      * @return bool
      */
-    public function isOptions()
+    public function isDelete()
     {
-        return ($_SERVER['REQUEST_METHOD'] === 'OPTIONS');
+        return ($_SERVER['REQUEST_METHOD'] === 'DELETE');
     }
 
     /**
@@ -478,7 +467,7 @@ class Request extends Singleton
     }
 
     /**
-     * @return array|false|QString
+     * @return array|false|string
      */
     public function getIp()
     {
@@ -505,6 +494,31 @@ class Request extends Singleton
         return $this->_request_ip;
     }
 
+    /**
+     * TRIES to get an ipv4 if the normal getIp fails and
+     * Cloudflare has set its CF-Pseudo-IPv4 header,
+     * it it is not set it will return the possible ipv6
+     * or the string UNKNOWN
+     * @return string
+     */
+    public function getIpV4()
+    {
+        $address = $this->getIp();
+
+        if (qs($address)->isIpV6() || $address === 'UNKNOWN')
+        {
+            if ($this->hasHeader('Cf-Pseudo-IPv4'))
+            {
+                $possible_ip = $this->getHeader('Cf-Pseudo-IPv4');
+
+                if (qs($possible_ip)->isIpV4()) {
+                    $address = $possible_ip;
+                }
+            }
+        }
+
+        return $address;
+    }
 
     /**
      * @return QString
@@ -672,11 +686,14 @@ class Request extends Singleton
     }
 
     /**
-     * @return QString
+     * @return string
      */
     public static function getUriWithQueryString()
     {
-        return htmlspecialchars($_SERVER["REQUEST_URI"]);
+        if (PHP_SAPI != 'cli' && isset($_SERVER["REQUEST_URI"]))
+            return htmlspecialchars($_SERVER["REQUEST_URI"]);
+
+        return '';
     }
 
 
@@ -685,11 +702,16 @@ class Request extends Singleton
      */
     public static function getUri()
     {
-        $uri = urldecode(
-            parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)
-        );
+        if (PHP_SAPI != 'cli')
+        {
+            $uri = urldecode(
+                parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)
+            );
 
-       return $uri;
+            return $uri;
+        }
+
+        return '';
     }
 
     /**
@@ -765,6 +787,14 @@ class Request extends Singleton
         return $this->_server_tree;
     }
 
+    public function getServerParam($key, $fallback = null)
+    {
+        if (isset($_SERVER[$key]))
+            return $_SERVER[$key];
+
+        return $fallback;
+    }
+
     /**
      * @param bool $key
      * @return bool|mixed|ValueTree
@@ -778,86 +808,6 @@ class Request extends Singleton
             return $this->_env_tree->get($key);
 
         return $this->_env_tree;
-    }
-
-    /**
-     * @return array|false|QString
-     */
-    public static function getHeaders()
-    {
-        $headers = '';
-
-        if (function_exists("apache_request_headers"))
-        {
-            $headers = apache_request_headers();
-        }
-        else
-        {
-            foreach ($_SERVER as $name => $value) {
-                if (substr($name, 0, 5) == 'HTTP_') {
-                    $headers[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))))] = $value;
-                }
-            }
-        }
-
-        return $headers;
-    }
-
-    /**
-     * @return string
-     */
-    public static function getHeadersAsString()
-    {
-        $headers = self::getHeaders();
-
-        $txt = "";
-
-        foreach ($headers as $header => $value) {
-            $txt .= "$header: $value \n";
-        }
-
-        return $txt;
-    }
-
-    /**
-     * @param bool $key
-     * @return bool|mixed|ValueTree
-     */
-    public function header($key = false)
-    {
-        if (!isset($this->_headers_tree))
-            $this->_headers_tree = new ValueTree(self::getHeaders(), true, true);
-
-        if ($key)
-            return $this->_headers_tree->get($key);
-
-        return $this->_headers_tree;
-    }
-
-    /**
-     * Find a header case insensitive
-     * @param $key
-     * @return bool
-     */
-    public function hasHeaderIgnoreCase($key)
-    {
-        $headers = new_vt(self::getHeaders());
-        $headers->changeKeysToLowerCase();
-
-        return $headers->has(qs($key)->toLowerCase()->toStdString());
-    }
-
-
-    /**
-     * @param $key
-     * @return bool|mixed
-     */
-    public function getHeaderIgnoreCase($key)
-    {
-        $headers = new_vt(self::getHeaders());
-        $headers->changeKeysToLowerCase();
-
-        return $headers->get(qs($key)->toLowerCase()->toStdString(), null);
     }
 
     public function getHeader($key, $fallback = false)
@@ -890,6 +840,82 @@ class Request extends Singleton
         $key = qs($key)->toLowerCase()->toStdString();
 
         return $this->normalized_headers->has($key);
+    }
+
+    /**
+     * @return array|false|QString
+     */
+    public static function getHeaders()
+    {
+        $headers = '';
+
+        if (function_exists("apache_request_headers"))
+        {
+            $headers = apache_request_headers();
+        }
+        else
+        {
+            $headers = array();
+
+            $copy_server = array(
+                'CONTENT_TYPE'   => 'Content-Type',
+                'CONTENT_LENGTH' => 'Content-Length',
+                'CONTENT_MD5'    => 'Content-Md5',
+            );
+
+            foreach ($_SERVER as $key => $value) {
+                if (substr($key, 0, 5) === 'HTTP_') {
+                    $key = substr($key, 5);
+                    if (!isset($copy_server[$key]) || !isset($_SERVER[$key])) {
+                        $key = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', $key))));
+                        $headers[$key] = $value;
+                    }
+                } elseif (isset($copy_server[$key])) {
+                    $headers[$copy_server[$key]] = $value;
+                }
+            }
+
+            if (!isset($headers['Authorization'])) {
+                if (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+                    $headers['Authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+                } elseif (isset($_SERVER['PHP_AUTH_USER'])) {
+                    $basic_pass = isset($_SERVER['PHP_AUTH_PW']) ? $_SERVER['PHP_AUTH_PW'] : '';
+                    $headers['Authorization'] = 'Basic ' . base64_encode($_SERVER['PHP_AUTH_USER'] . ':' . $basic_pass);
+                } elseif (isset($_SERVER['PHP_AUTH_DIGEST'])) {
+                    $headers['Authorization'] = $_SERVER['PHP_AUTH_DIGEST'];
+                }
+            }
+        }
+
+        return $headers;
+    }
+
+    /**
+     * @return string
+     */
+    public static function getHeadersAsString()
+    {
+        $headers = self::getHeaders();
+
+        $txt = "";
+
+        foreach ($headers as $header => $value) {
+            $txt .= "$header: $value \n";
+        }
+
+        return $txt;
+    }
+
+    /**
+     * @param bool $key
+     * @return bool|mixed|ValueTree
+     */
+    public function header($key = false)
+    {
+        if ($key)
+            return $this->getHeader($key);
+
+        return $this->getHeaders();
     }
 
     /**

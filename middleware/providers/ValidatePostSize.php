@@ -2,7 +2,7 @@
 
 namespace Quantum\Middleware;
 
-use  Quantum\Middleware\Foundation;
+use Quantum\Middleware\Foundation;
 use Quantum\Request;
 
 use Closure;

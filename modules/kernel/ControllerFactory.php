@@ -155,7 +155,6 @@ class ControllerFactory
                 $c->user_account = $c->user->account;
             }
 
-
             \QM::output()->set('user', $c->user);
 
             \QM::register("user", $c->user);

@@ -9,12 +9,7 @@ class ExecuteAppMiddlewares extends \Quantum\Middleware\Foundation\SystemMiddlew
 
     public function handle(\Quantum\Request $request, \Closure $closure)
     {
-        $app_config = \QM::config()->getActiveAppConfig();
-
-        if ($app_config === false)
-            return;
-
-        $middlewares = $app_config->get('middlewares', []);
+        $middlewares = get_active_app_setting('middlewares', []);
 
         if (empty($middlewares))
             return;

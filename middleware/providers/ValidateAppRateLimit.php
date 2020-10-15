@@ -34,9 +34,8 @@ class ValidateAppRateLimit  extends Foundation\SystemMiddleware
     {
         $app_config = \QM::config()->getHostedAppConfig();
 
-        if (empty($app_config))
-        {
-            throw_exception('App Configuration not loaded, please check apps.php');
+        if (!is_vt($app_config)) {
+            $this->getOutput()->display404();
         }
 
         if ($app_config->has('rate_limit') && $app_config->has('rate_limit_time'))

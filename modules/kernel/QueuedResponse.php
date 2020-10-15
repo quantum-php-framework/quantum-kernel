@@ -23,7 +23,7 @@ class QueuedResponse
     /**
      * @param mixed $response
      */
-    public function setResponse($response): void
+    public function setResponse($response)
     {
         $this->response = $response;
     }
@@ -39,7 +39,7 @@ class QueuedResponse
     /**
      * @param mixed $is_view
      */
-    public function setIsView($is_view): void
+    public function setIsView($is_view)
     {
         $this->is_view = $is_view;
     }

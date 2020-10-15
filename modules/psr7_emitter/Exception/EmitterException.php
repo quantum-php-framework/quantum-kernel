@@ -8,12 +8,12 @@ use RuntimeException;
 
 class EmitterException extends RuntimeException implements \Quantum\Psr7\Exception\ExceptionInterface
 {
-    public static function forHeadersSent() : self
+    public static function forHeadersSent()
     {
         return new self('Unable to emit response; headers already sent');
     }
 
-    public static function forOutputSent() : self
+    public static function forOutputSent()
     {
         return new self('Output has been emitted previously; cannot emit response');
     }

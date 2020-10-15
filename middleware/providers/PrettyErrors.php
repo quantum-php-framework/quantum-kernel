@@ -16,10 +16,14 @@ class PrettyErrors extends Foundation\SystemMiddleware
      */
     public function handle(\Quantum\Request $request, \Closure $closure)
     {
+        return null;
+
         $config = \QM::config();
 
-        if ($config->isDevelopmentEnvironment() || $request->hasParam('qm_show_pretty_errors'))
+        if ($config->isDevelopmentEnvironment() || $request->hasParam('qm_show_pretty_errors') || $request->getIp() == get_overridable_route_setting('allowed_debug_ip'))
         {
+            //halt();
+
             $handler = new \Whoops\Handler\PrettyPageHandler;
             //$handler->setEditor('phpstorm');
             $handler->setEditor("phpstorm");

@@ -266,10 +266,7 @@ class InternalPathResolver extends Singleton
         $this->script_root = $this->quantum_root."script/";
 
         $this->app_root = '';
-
-        //$this->updateAppRoot("admin");
-
-        //$this->accounts_fs_root = $this->root_folder."/accounts/fs/";
+        $this->accounts_fs_root = $this->web_root."/static/accounts/fs/";
 
     }
 
@@ -282,7 +279,7 @@ class InternalPathResolver extends Singleton
         $this->app_root = $this->hosted_apps_root.$dir.'/';
 
         if (!is_dir($this->app_root))
-           throw new \Exception ("App Root Folder not found: ".$this->app_root);
+            throw new \Exception ("App Root Folder not found: ".$this->app_root);
 
         $this->controllers_root = $this->app_root.'controllers/';
         $this->store_controllers_root = $this->app_root.'controllers/store/';
@@ -307,9 +304,6 @@ class InternalPathResolver extends Singleton
         return $this->apps_root;
     }
 
-
-
-
     /**
      * @return string
      */
@@ -322,6 +316,17 @@ class InternalPathResolver extends Singleton
         return $file;
     }
 
+    /**
+     * @return string
+     */
+    public function getQubitConfigFile()
+    {
+        $location = $this->config_root;
+        $name = "qubit.conf.php";
+        $file = $location . $name;
+
+        return $file;
+    }
 
     /**
      * @return string
@@ -334,6 +339,7 @@ class InternalPathResolver extends Singleton
 
         return $file;
     }
+
 
     /**
      * @return string

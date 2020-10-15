@@ -168,12 +168,14 @@ class Table
         return $this;
     }
 
+
     /**
-     * Set to Quantum\Output
+     * @param string $name
+     * @return $this
      */
-    public function toOutput()
+    public function toOutput($name = 'table')
     {
-        Output::getInstance()->set('table', $this->getHtml());
+        Output::getInstance()->set($name, $this->getHtml());
         return $this;
     }
 

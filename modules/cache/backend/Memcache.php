@@ -45,13 +45,10 @@ class Memcache extends Backend
         if (empty($config))
             throw new StorageSetupException('no active app config');
 
-        if (!$config->has('memcache_host'))
-            throw new StorageSetupException('memcache_host not defined in environment config');
+        $host = $config->get('memcache_host', '127.0.0.1');
+        $port = $config->get('memcache_port', '11211');
 
-        if (!$config->has('memcache_port'))
-            throw new StorageSetupException('memcache_port not defined in environment config');
-
-        $this->addServer($config->get('memcache_host'), $config->get('memcache_port'));
+        $this->addServer($host, $port);
         $this->enableBinaryProtocol();
 
         if ($config->has('memcache_username') && $config->has('memcache_password'))

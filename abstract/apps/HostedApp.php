@@ -118,6 +118,17 @@ abstract class HostedApp
         return Request::getInstance();
     }
 
+    function getQubitQueue()
+    {
+        if (!isset($this->_qubit_queue))
+        {
+            $config = \QM::config()->getHostedAppConfig();
+            $this->_qubit_queue = new \Quantum\Qubit\QubitAppQueue($config->get('uri'));
+        }
+
+        return $this->_qubit_queue;
+    }
+
 
     /**
      * @param $middlewares

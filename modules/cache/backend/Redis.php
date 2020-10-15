@@ -524,8 +524,9 @@ class Redis extends Backend
                 $result = $this->parseRedisResponse( $this->redis->set($key, ($initial_value + $offset)) );
             }
 
-            if ($expiry)
+            if ($expiry) {
                 $this->setExpiration($key, $expiry);
+            };
 
             $this->addToInternalCache($key, (int) $this->redis->get($key));
 
@@ -565,16 +566,19 @@ class Redis extends Backend
         $start_time = microtime( true );
 
         try {
+
             if ($this->has($key)) {
                 $result = $this->parseRedisResponse( $this->redis->decrby($key, $offset) );
             } else {
                 $result = $this->parseRedisResponse( $this->redis->set($key, ($initial_value - $offset)) );
             }
 
-            if ($expiry)
+            if ($expiry) {
                 $this->setExpiration($key, $expiry);
+            };
 
             $this->addToInternalCache($key, (int) $this->redis->get($key));
+
         } catch ( Exception $exception ) {
             $this->handleException( $exception );
             return false;

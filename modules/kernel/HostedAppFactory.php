@@ -30,11 +30,18 @@ class HostedAppFactory
 
         $appName = $privateAppConfig->get('class_name', "App");
 
-        $a = new $appName();
-        $a->_environment_config = $config->getHostedAppConfig();
-        $a->_private_config = $privateAppConfig;
 
-        return $a;
+        if (class_exists($appName))
+        {
+            $a = new $appName();
+            $a->_environment_config = $config->getHostedAppConfig();
+            $a->_private_config = $privateAppConfig;
+
+            return $a;
+        }
+
+        return null;
+
     }
 
 }

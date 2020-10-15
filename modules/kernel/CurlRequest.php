@@ -71,7 +71,7 @@ class CurlRequest
     /**
      * Set the address for the request.
      *
-     * @param QString $address
+     * @param string $address
      *   The URI or IP address to request.
      */
     public function setAddress($address)
@@ -82,9 +82,9 @@ class CurlRequest
     /**
      * Set the username and password for HTTP basic authentication.
      *
-     * @param QString $username
+     * @param string $username
      *   Username for basic authentication.
-     * @param QString $password
+     * @param string $password
      *   Password for basic authentication.
      */
     public function setBasicAuthCredentials($username, $password)
@@ -95,7 +95,7 @@ class CurlRequest
     /**
      * Enable cookies.
      *
-     * @param QString $cookie_path
+     * @param string $cookie_path
      *   Absolute path to a txt file where cookie information will be stored.
      */
     public function enableCookies($cookie_path)
@@ -198,7 +198,7 @@ class CurlRequest
     /**
      * Get the response body.
      *
-     * @return QString
+     * @return string
      *   Response body.
      */
     public function getResponse()
@@ -209,7 +209,7 @@ class CurlRequest
     /**
      * Get the response header.
      *
-     * @return QString
+     * @return string
      *   Response header.
      */
     public function getHeader()
@@ -244,7 +244,7 @@ class CurlRequest
     /**
      * Get any cURL errors generated during the execution of the request.
      *
-     * @return QString
+     * @return string
      *   An error message, if any error was given. Otherwise, empty.
      */
     public function getError()
@@ -258,8 +258,8 @@ class CurlRequest
      * This method should not be called until after execute(), and will only check
      * for the content if the response code is 200 OK.
      *
-     * @param QString $content
-     *   QString for which the response will be checked.
+     * @param string $content
+     *   string for which the response will be checked.
      *
      * @return bool
      *   TRUE if $content was found in the response, FALSE otherwise.

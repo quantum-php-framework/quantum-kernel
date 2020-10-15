@@ -674,7 +674,7 @@ class Output extends Singleton
     /**
      * @param $type
      */
-    public function displaySystemError($type)
+    public function displaySystemError($type, $additional_message = '')
     {
         if ($type == '404')
         {
@@ -682,8 +682,17 @@ class Output extends Singleton
             header('HTTP/1.0 404 Not Found');
         }
 
-        if (Config::getInstance()->isProductionEnvironment())
-            \ExternalErrorLoggerService::info($type, ['url' => Request::getPublicURL(), 'request' => json_encode($_REQUEST), 'post' => json_encode($_POST)]);
+        $e = new \Exception;
+        $error_msg = $e->getTraceAsString();
+
+        if (Config::getInstance()->isProductionEnvironment()) {
+            \ExternalErrorLoggerService::info($type, [
+                'url' => Request::getPublicURL(),
+                'request' => json_encode($_REQUEST),
+                'post' => json_encode($_POST),
+                'msg' => $error_msg,
+                'data' => $additional_message]);
+        }
 
         $e = new \Exception;
         $error_msg = $e->getTraceAsString();

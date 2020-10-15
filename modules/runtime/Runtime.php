@@ -23,7 +23,7 @@ class Runtime
     public $config;
 
     /**
-     * @var \QueuedResponse
+     * @var QueuedResponse
      */
     public $queued_response;
     /**
@@ -203,7 +203,6 @@ class Runtime
     public function __construct()
     {
         Profiler::enableIfProfilerFileExists();
-        //qm_profiler_enable();
         Profiler::start("Quantum\Runtime::__construct");
 
         $this->initKernel();
@@ -254,8 +253,11 @@ class Runtime
 
     private function initPluginsRuntime()
     {
-        $this->plugins_runtime = new PluginsRuntime();
+        if (!is_cli()) {
+            $this->plugins_runtime = new PluginsRuntime();
+        }
     }
+
 
     /**
      *
@@ -274,6 +276,9 @@ class Runtime
 
         $this->environment = $this->config->getEnvironment();
         $this->app_config = $this->config->getHostedAppConfig();
+
+        //QM::register("environment", $this->environment);
+        //QM::register("app_config", $this->app_config);
     }
 
     /**
@@ -285,6 +290,8 @@ class Runtime
 
         $cfg = \ActiveRecord\Config::instance();
         $cfg->set_model_directory(array($this->models_root, $this->ipt->shared_app_activerecord_models_root));
+
+        //dd($this->environment);
 
         $conn = array(
             $this->environment->instance => 'mysql://' . $this->environment->db_user . ':' .
@@ -318,9 +325,10 @@ class Runtime
     {
         RoutesRegistry::addRoutes($this->config->getGlobalRoutes());
         RoutesRegistry::addRoutes($this->config->getActiveAppRoutes());
-        RoutesRegistry::addRoutes($this->plugins_runtime->getRoutes());
 
-        //dd(RoutesRegistry::getInstance()->getRoutes());
+        if (!is_cli()) {
+            RoutesRegistry::addRoutes($this->plugins_runtime->getRoutes());
+        }
     }
 
 
@@ -376,11 +384,11 @@ class Runtime
             $this->output->addProperties($this->activeController->registry->getProperties());
         }
 
-
         $this->callAppMethod("pre_render");
 
-        if (isset($this->activeController))
+        if (isset($this->activeController)) {
             $this->callInternalApiControllerFunction($this->activeController, "__pre_render");
+        }
 
         $this->processQueuedResponse();
 
@@ -438,17 +446,17 @@ class Runtime
     }
 
 
+
     /**
      *
      */
     private function routeBasedDispatch()
     {
-        //$uri = $this->request->getUri();
-
         $route = $this->config->getCurrentRoute();
 
-        if (empty($route))
+        if (empty($route)) {
             ApiException::resourceNotFound();
+        }
 
         $this->controller = $route->get('controller');
 
@@ -647,9 +655,5 @@ class Runtime
         if (method_exists($this->app, $method_name))
             call_user_func(array($this->app, $method_name));
     }
-
-
-
-
 
 }

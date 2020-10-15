@@ -299,6 +299,18 @@ class URL
     }
 
     /**
+     * @param $key
+     * @param $value
+     * @return URL
+     */
+    public function withPostParameter ($key, $value)
+    {
+        $c = clone $this;
+        $c->postData[$key] = $value;
+        return $c;
+    }
+
+    /**
      * @return array
      */
     public function getParameters()
@@ -388,17 +400,17 @@ class URL
     /**
      * @return false|string
      */
-    public function getFileContents()
+    public function getContents($usePostCommand = true)
     {
         $contextConfig = array('http' =>
             array(
-                'method'  => !empty($this->postData) ? 'POST': 'GET',
+                'method'  => !empty($usePostCommand) ? 'POST': 'GET',
                 'header'  => 'Content-Type: application/x-www-form-urlencoded',
-                'content' => $this->postData
+                'content' => $this->getQueryString()
             )
         );
 
-        return file_get_contents($this->toString(), false, stream_context_create($contextConfig));
+        return file_get_contents($this, false, stream_context_create($contextConfig));
     }
 
     /**

@@ -284,9 +284,9 @@ class Form implements \Countable
      * @param $paramName
      * @param $defaultValue
      */
-    public function file($paramName, $defaultValue, $required = false)
+    public function file($visibleName, $paramName, $required = false)
     {
-        $this->addParam('file', $paramName, $paramName, $defaultValue, $required);
+        $this->addParam('file', $visibleName, $paramName, '', $required);
         return $this;
     }
 
@@ -304,9 +304,9 @@ class Form implements \Countable
     /**
      * @param $visibleName
      */
-    public function submitButton($visibleName)
+    public function submitButton($visibleName, $id = "")
     {
-        $this->addParam ("submit", $visibleName, null, null, false);
+        $this->addParam ("submit", $visibleName, $id, null, false);
         return $this;
     }
 
@@ -317,6 +317,11 @@ class Form implements \Countable
     {
         $this->hidden('csrf', \Quantum\Crypto::encryptWithLocalKey(\QM::session()->get('csrf')));
         return $this;
+    }
+
+    public function custom($visibleName, $paramName, $callback)
+    {
+        $this->addParam('custom', $visibleName, $paramName, $callback);
     }
 
     /**
@@ -426,7 +431,7 @@ class Form implements \Countable
 
 
     /**
-     * @return QString
+     * @return string
      */
     private function getHeader()
     {
@@ -464,7 +469,7 @@ class Form implements \Countable
     }
 
     /**
-     * @return QString
+     * @return string
      */
     private function getFooter()
     {
@@ -474,7 +479,7 @@ class Form implements \Countable
     }
 
     /**
-     * @return QString
+     * @return string
      */
     private function getAllFieldsHtml()
     {
@@ -491,7 +496,7 @@ class Form implements \Countable
                     $html .= $this->factory->getSelectInputHtml($field);
                     break;
                 case 'hidden':
-                    $html .= '<input type="hidden" name="' . $field->paramName . '" value="' . $field->value . '">';
+                    $html .= '<input type="hidden" name="' . $field->paramName . '" value="' . $field->value . '" id="'.$field->paramName.'">';
                     break;
                 case 'textarea':
                     $html .= $this->factory->getTextAreaHtml($field);
@@ -505,7 +510,9 @@ class Form implements \Countable
                 case 'password':
                     $html .= $this->prepare($field, $this->factory->getPasswordInputHtml($field));
                     break;
-
+                case 'custom':
+                    $html .= $field->value;
+                    break;
                 case 'file':
                     $html .= $this->factory->getFileInputHtml($field);
                     break;

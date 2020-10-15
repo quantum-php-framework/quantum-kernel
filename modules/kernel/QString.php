@@ -258,6 +258,7 @@ class QString implements Countable, IteratorAggregate, ArrayAccess
         }
     }
 
+
     /**
      * @return bool
      */
@@ -381,6 +382,14 @@ class QString implements Countable, IteratorAggregate, ArrayAccess
     public function isIpV6()
     {
         return (filter_var($this->text, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false);
+    }
+
+    /**
+     * @return bool
+     */
+    public function isIpV4()
+    {
+        return (filter_var($this->text, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) !== false);
     }
 
     /**
@@ -2170,7 +2179,7 @@ class QString implements Countable, IteratorAggregate, ArrayAccess
         $title = preg_replace('![^'.preg_quote($separator).'\pL\pN\s]+!u', '', mb_strtolower($title));
         // Replace all separator characters and whitespace by a single separator
         $title = preg_replace('!['.preg_quote($separator).'\s]+!u', $separator, $title);
-        return static::create(trim($title, $separator));
+        return trim($title, $separator);
     }
 
     /**
@@ -2786,7 +2795,7 @@ class QString implements Countable, IteratorAggregate, ArrayAccess
 
 
     /**
-     * @return QString
+     * @return string
      */
     public function toStdString()
     {

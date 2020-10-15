@@ -16,7 +16,7 @@ class PageCache
      * @param $expiration
      * @return array
      */
-    public static function store($route_uri, $content, $expiration)
+    public static function store($route_uri, $content, $expiration, $tags = null)
     {
         if (self::shouldOptimizeHtml())
             $content = self::optimizeHtml($content);
@@ -29,7 +29,8 @@ class PageCache
         $data['content_expiration'] = gmdate("D, d M Y H:i:s", strtotime($content_date) + $expiration). ' GMT';
         $data['headers'] = headers_list();
 
-        Cache::set(self::getCacheKeyForUri($route_uri), $data, $expiration);
+        $cache_key = self::getCacheKeyForUri($route_uri);
+        Cache::set($cache_key, $data, $expiration);
 
         return $data;
     }
@@ -128,21 +129,15 @@ class PageCache
         if (\Auth::isUserSessionOpen() && !self::shouldCacheLoggedInUsers($route))
             return false;
 
-        $app_config = \QM::config()->getHostedAppConfig();
-
-        if ($app_config->hasEqualParam('full_page_cache', 1))
+        $app_cache_enabled =  get_overridable_app_setting('full_page_cache', false);
+        $cache_all_routes  =  get_overridable_app_setting('full_page_cache_all_routes', false);
+        if ($app_cache_enabled)
         {
-            if ($route->has('page_cache'))
-            {
+            if ($route->has('page_cache')) {
                 return $route->hasEqualParam('page_cache', 1);
             }
 
-            if ($app_config->has('full_page_cache_all_routes'))
-            {
-                return $app_config->hasEqualParam('full_page_cache_all_routes', 1);
-            }
-
-            return false;
+            return $cache_all_routes;
         }
 
         return false;
@@ -216,20 +211,20 @@ class PageCache
      */
     public static function getRouteExpiration($route)
     {
-        $app_config = \QM::config()->getHostedAppConfig();
+        $expiration = get_overridable_app_setting('full_page_cache_expiration', false);
 
-        if (isset($app_config['full_page_cache_expiration']))
-            return $app_config['full_page_cache_expiration'];
+        if ($expiration)
+            return $expiration;
 
         return $route->get('page_cache_expiration', 3600);
     }
 
     public static function shouldCacheLoggedInUsers($route)
     {
-        $app_config = \QM::config()->getHostedAppConfig();
+        $result = get_overridable_app_setting('full_page_cache_logged_in_users', false);
 
-        if (isset($app_config['full_page_cache_logged_in_users']))
-            return $app_config['full_page_cache_logged_in_users'] == 1;
+        if ($result)
+            return $result;
 
         return $route->get('page_cache_logged_in_users', 0) == 1;
     }
@@ -237,10 +232,10 @@ class PageCache
 
     public static function shouldOptimizeHtml()
     {
-        $app_config = \QM::config()->getHostedAppConfig();
+        $result = get_overridable_app_setting('full_page_cache_optimize_html', false);
 
-        if (isset($app_config['full_page_cache_optimize_html']))
-            return $app_config['full_page_cache_optimize_html'] == 1;
+        if ($result)
+            return $result;
 
         $route = \QM::config()->getCurrentRoute();
 

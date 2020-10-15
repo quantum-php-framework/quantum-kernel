@@ -52,9 +52,18 @@ class ServiceProvider extends Singleton
     /**
      * ServiceProvider constructor.
      */
-    public function __construct()
+    public function __construct($backend = null)
     {
-        $this->initFromEnvironmentConfig();
+        if ($backend)
+        {
+            $this->setDriver($backend, false);
+            EventsManager::getInstance()->dispatch(self::BackendInitEvent, $backend);
+
+        }
+        else
+        {
+            $this->initFromEnvironmentConfig();
+        }
     }
 
     /**
