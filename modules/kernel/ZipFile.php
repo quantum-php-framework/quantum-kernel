@@ -102,11 +102,12 @@ class ZipFile
 
             //dd($info['name']);
             $file = qf($tmp_dir.'/'.$info['name'])->replaceContent($contents);
-            $file->changeMode( 0644 & ~ umask() );
 
             if ( ! $file->existsAsFile()) {
                 return Result::fail(  'Could not copy file.'. $info['name'] );
             }
+
+            $file->changeMode( 0644 & ~ umask() );
         }
 
         $z->close();

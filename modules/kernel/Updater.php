@@ -17,55 +17,86 @@ class Updater
         $this->api_url = qurl(QM_GITLAB_SERVER_API_URL)->withPath('api/v4/');
     }
 
+    private function downloadPackageToTmpDir($download_url)
+    {
+        $pkg_file = qs($download_url)->fromLastOccurrenceOf('/')->toStdString();
+
+        $tmp_pkg_file = qf(InternalPathResolver::getInstance()->tmp_root)->getChildFile($pkg_file);
+
+        $result = qurl($download_url)->downloadToFile($tmp_pkg_file);
+
+        if ($result->failed()) {
+            return $result;
+        }
+
+        return Result::ok('ok', $tmp_pkg_file);
+    }
+
     public function updateKernel()
     {
         if (!$this->isKernelUpdateAvailable()) {
             return Result::fail('No update available');
         }
 
-        $releases = $this->getReleases();
+        $latest_release = $this->getLatestRelease();
 
-        $latest_release = $releases[0];
+        if (!isset($latest_release->assets->sources[0]->url)) {
+            return Result::fail('Error parsing response: no package url found');
+        }
 
         $download_url = $latest_release->assets->sources[0]->url;
 
-        $file_name = qs($download_url)->fromLastOccurrenceOf('/')->toStdString();
-        $file_dir = qs($file_name)->upToFirstOccurrenceOf('.zip')->toStdString();
+        $download_result = $this->downloadPackageToTmpDir($download_url);
 
-        $tmp_pkg_file = qf(InternalPathResolver::getInstance()->tmp_root)->getChildFile($file_name);
-
-        $result = qurl($download_url)->downloadToFile($tmp_pkg_file);
-
-        if ($result->wasOk() && $tmp_pkg_file->existsAsFile())
-        {
-            $kernel_dir = qf(InternalPathResolver::getInstance()->kernel_root);
-
-            $result = ZipFile::unzip($tmp_pkg_file->getRealPath(), $kernel_dir->getRealPath());
-
-            if ($result->wasOk())
-            {
-                $new_kernel_dir = $kernel_dir->getChildFile($file_dir);
-
-                if ($new_kernel_dir->isDirectory())
-                {
-                    $old_kernel_dir = $kernel_dir->getChildFile('system');
-
-                    if ($old_kernel_dir->isDirectory()) {
-                        $old_kernel_dir->move($kernel_dir->getChildFile('system-old')->getPath());
-                    }
-                    else {
-                        return Result::fail('Unknown error');
-                    }
-
-                    if ($new_kernel_dir->move($kernel_dir->getChildFile('system')->getPath())->isDirectory()) {
-                        return Result::ok();
-                    }
-
-                }
-            }
+        if ($download_result->failed()) {
+            return $download_result;
         }
 
-        return Result::fail('Unknown error');
+        $tmp_pkg_file = $download_result->getData();
+
+        $kernel_dir = qf(InternalPathResolver::getInstance()->kernel_root);
+
+        $result = ZipFile::unzip($tmp_pkg_file->getRealPath(), $kernel_dir->getRealPath());
+
+        if ($result->failed()) {
+            return $result;
+        }
+
+        $extracted_pkg_dirname  = $tmp_pkg_file->getFileNameWithoutExtension();
+
+        $new_pkg_dir = qf($kernel_dir)->getChildFile($extracted_pkg_dirname);
+
+        if (!$new_pkg_dir->isDirectory()) {
+            return Result::fail('unziped pkg not found'.$new_pkg_dir->getPath());
+        }
+
+        $old_pkg_dir = $kernel_dir->getChildFile('system');
+
+        if ($old_pkg_dir->isDirectory()) {
+            $old_pkg_dir->move($kernel_dir->getChildFile('system-'.qs(QM_KERNEL_VERSION)->slug()->toStdString())->getPath());
+        }
+
+        $new_pkg_dir = $new_pkg_dir->move($kernel_dir->getChildFile('system')->getPath());
+
+        if ($new_pkg_dir->isDirectory())
+        {
+            $tmp_pkg_file->delete();
+            return Result::ok();
+        }
+
+        return Result::fail();
+    }
+
+    public function getLatestRelease()
+    {
+        $releases = $this->getReleases();
+
+        if (is_array($releases) && isset($releases[0])) {
+            return $releases[0];
+        }
+
+        return null;
+
     }
 
 

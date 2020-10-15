@@ -616,10 +616,11 @@ class File
      */
     public function move($target)
     {
-        $this->copy($target);
-        $this->delete();
+        if ($this->rename($target)) {
+            return new File($target);
+        }
 
-        return new File($target);
+        return false;
     }
 
     /**
@@ -628,7 +629,7 @@ class File
      */
     public function rename($target)
     {
-        return $this->move($target);
+        return rename($this->path, $target);
     }
 
     /**
