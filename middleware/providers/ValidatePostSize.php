@@ -48,7 +48,7 @@ class ValidatePostSize extends Foundation\SystemMiddleware
         if ($max > 0 && $request->server('CONTENT_LENGTH') > $max)
         {
             $this->logException('max_post_size');
-            throw new PostTooLargeException;
+            throw_exception('dafuq');
         }
 
         return $next($request);

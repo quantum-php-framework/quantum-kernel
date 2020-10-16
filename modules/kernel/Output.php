@@ -83,8 +83,8 @@ class Output extends Singleton
         //$this->smarty->allow_php_tag = true;
         //$this->smarty->plugins_dir[] = $this->ipt->lib_root.'smarty/plugins';
 
-        $this->set('QM_Client', Client::getInstance());
-        $this->set('QM_Environment', Config::getInstance()->getEnvironment());
+        //$this->set('QM_Client', Client::getInstance());
+        //$this->set('QM_Environment', Config::getInstance()->getEnvironment());
         
         //\Quantum::setSmarty($this->smarty);
         //var_dump($this->smarty);
@@ -581,6 +581,12 @@ class Output extends Singleton
      */
     public static function outputJson($json)
     {
+        if (is_array($json))
+            $json = json_encode($json);
+
+        if (is_vt($json))
+            $json = $json->toJson();
+
         header("Content-Type: application/json");
         header("Cache-Control: no-store");
         header("Pragma: no-cache");

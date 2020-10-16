@@ -160,7 +160,7 @@ class Kernel extends Singleton
     /**
      * @return string
      */
-    function getVersion()
+    public static function getVersion()
     {
         return QM_KERNEL_VERSION;
     }

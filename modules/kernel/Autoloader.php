@@ -197,19 +197,21 @@ class Autoloader extends Singleton
      */
     private function handleProbableModuleClass($className)
     {
-        if (!qs($className)->contains('\\'))
+        $class_name_qs = qs($className);
+
+        if (!$class_name_qs->contains('\\') || $class_name_qs->startsWith('Quantum')) {
             return Result::fail();
+        }
 
         $original_class = $className;
 
-        $namespace = QString::create($className)->upToFirstOccurrenceOf("\\")->toStdString();
+        $namespace = $class_name_qs->upToFirstOccurrenceOf("\\")->toStdString();
 
-        if (!$this->moduleLocator->hasModuleForNamespace($namespace))
+        if (!$this->moduleLocator->hasModuleForNamespace($namespace)) {
             return Result::fail();
+        }
 
-        qm_profiler_start('ModuleClassLoad::'.$className);
-
-        $className = QString::create($className)->fromLastOccurrenceOf("\\")->toStdString();
+        $className = $class_name_qs->fromLastOccurrenceOf("\\")->toStdString();
 
         $module = $this->moduleLocator->getModule($namespace);
 
@@ -241,45 +243,23 @@ class Autoloader extends Singleton
 
         $module_directories = deepscan_dirs($modules_path->getArray());
 
-        $located_file = "";
-
         foreach($module_directories as $directory)
         {
             $path = $directory.$className.".php";
 
             if(\file_exists($path))
             {
-                if (ClassReader::getClassFullNameFromFile($path) === $original_class)
+                require_once $path;
+
+                if (class_exists($original_class))
                 {
-                    $located_file = $path;
-                    break;
+                    return Result::ok();
                 }
             }
+
         };
 
-        if (empty($located_file))
-        {
-            trigger_error("Module Class not found: ".$original_class);
-            return Result::fail();
-        }
-
-        $this->loadClass($original_class, $located_file);
-
-        qm_profiler_stop('ModuleClassLoad::'.$className);
-
-        return Result::ok();
-
-    }
-
-    private function loadClass($original_class, $path)
-    {
-        if(\file_exists($path))
-        {
-            if (ClassReader::getClassFullNameFromFile($path) === $original_class)
-            {
-                require_once $path;
-            }
-        }
+        return Result::fail();
     }
 
     public function getDirectories()
@@ -292,59 +272,49 @@ class Autoloader extends Singleton
      */
     private function handle($className)
     {
-        //qm_profiler_start('AutoLoad::'.$className);
+        $className = qs($className);
 
-        $r = $this->handleProbableModuleClass($className);
-
-        if ($r->wasOk())
-            return;
-
-        $fileNameFormats = array(
-            '%s.php',
-        );
-
-        if (qs($className)->contains('Quantum\\'))
-            $system_class = true;
+        if ($className->contains('Quantum\\'))
+        {
+            $directories = $this->system_directories;
+        }
         else
-            $system_class = false;
+        {
+            $r = $this->handleProbableModuleClass($className->toStdString());
 
-        $path = str_ireplace('_', '/', $className);
+            if ($r->wasOk()) {
+                return;
+            }
 
+            $directories = $this->directories;
+        }
 
-        if (qs($className)->contains('\\'))
-                $className = QString::create($className)->fromLastOccurrenceOf("\\")->toStdString();
+        $path = str_ireplace('_', '/', $className->toStdString());
 
-        if(@include $path.'.php'){
-            //qm_profiler_stop('AutoLoad::'.$className);
+        if ($className->contains('\\')) {
+            $classFileName = $className->fromLastOccurrenceOf("\\")->toStdString();
+        }
+        else {
+            $classFileName = $className->toStdString();
+        }
+
+        if(file_exists($path.'.php') && @include $path.'.php') {
             return;
         }
 
-        if ($system_class)
-            $directories = $this->system_directories;
-        else
-            $directories = $this->directories;
+        foreach($directories as $directory)
+        {
+            $path = $directory.sprintf('%s.php', $classFileName);
 
+            if(\file_exists($path))
+            {
+                require_once $path;
 
-        foreach($directories as $directory){
-            foreach($fileNameFormats as $fileNameFormat){
-
-                $path = $directory.sprintf($fileNameFormat, $className);
-                if(\file_exists($path)){
-                    //echo ('loading: '.$path."<br/>");
-                    //echo ('className: '.$className."<br/><br/>");
-                    //qm_profiler_start('Required::'.$path);
-
-                    require_once $path;
-                    //qm_profiler_stop('Required::'.$path);
-
-                    //qm_profiler_stop('AutoLoad::'.$className);
+                if (class_exists($className->toStdString())) {
                     return;
                 }
             }
         }
-
-        //qm_profiler_stop('AutoLoad::'.$className);
-
 
     }
 

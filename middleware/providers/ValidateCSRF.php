@@ -8,27 +8,6 @@ use Quantum\Request;
 use Closure;
 
 /**
- * Class ValidateCSRFException
- * @package Quantum\Middleware
- */
-class ValidateCSRFException extends \Quantum\HttpException
-{
-    /**
-     * PostTooLargeException constructor.
-     *
-     * @param  string|null  $message
-     * @param  \Exception|null  $previous
-     * @param  array  $headers
-     * @param  int  $code
-     * @return void
-     */
-    public function __construct($message = null, Exception $previous = null, array $headers = array())
-    {
-        parent::__construct(413, $message, $headers);
-    }
-}
-
-/**
  * Class ValidateCSRF
  * @package Quantum\Middleware
  */

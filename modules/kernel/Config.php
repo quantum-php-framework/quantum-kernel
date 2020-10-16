@@ -332,6 +332,11 @@ class Config extends Singleton
                 return $route;
         }
 
+        $possible_route = dispatch_event('route_not_found');
+
+        if ($possible_route)
+            return $possible_route;
+
         return false;
     }
 
