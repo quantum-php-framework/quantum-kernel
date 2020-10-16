@@ -52,6 +52,9 @@ class Autoloader extends Singleton
     }
 
 
+    /**
+     *
+     */
     public function initDirectories()
     {
         $ipt = InternalPathResolver::getInstance();
@@ -70,6 +73,9 @@ class Autoloader extends Singleton
 
     }
 
+    /**
+     *
+     */
     public function addAppDirectories()
     {
         $ipt = InternalPathResolver::getInstance();
@@ -165,6 +171,14 @@ class Autoloader extends Singleton
     }
 
 
+    /**
+     * @return array
+     */
+    public function getDirectories()
+    {
+        return $this->directories;
+    }
+
 
     /**
      * @param $classname
@@ -199,7 +213,7 @@ class Autoloader extends Singleton
     {
         $class_name_qs = qs($className);
 
-        if (!$class_name_qs->contains('\\') || $class_name_qs->startsWith('Quantum')) {
+        if (!$class_name_qs->contains('\\')) {
             return Result::fail();
         }
 
@@ -231,13 +245,11 @@ class Autoloader extends Singleton
             }
         }
 
-        if (isset($ipt->shared_app_modules_root) && qs($module_directory)->isNotEmpty())
-        {
+        if (isset($ipt->shared_app_modules_root) && qs($module_directory)->isNotEmpty()) {
             $modules_path->add($ipt->shared_app_modules_root.$module_directory);
         }
 
-        if ($modules_path->isEmpty())
-        {
+        if ($modules_path->isEmpty()) {
             return Result::fail();
         }
 
@@ -251,8 +263,7 @@ class Autoloader extends Singleton
             {
                 require_once $path;
 
-                if (class_exists($original_class))
-                {
+                if (class_exists($original_class)) {
                     return Result::ok();
                 }
             }
@@ -262,13 +273,9 @@ class Autoloader extends Singleton
         return Result::fail();
     }
 
-    public function getDirectories()
-    {
-        return $this->directories;
-    }
 
     /**
-     * Thee autoloader...,  you can add more fileNameFormats, for ex: %s.class.php
+     * @param $className
      */
     private function handle($className)
     {
@@ -298,8 +305,14 @@ class Autoloader extends Singleton
             $classFileName = $className->toStdString();
         }
 
-        if(file_exists($path.'.php') && @include $path.'.php') {
-            return;
+        $file_in_current_dir = $path.'.php';
+        if(file_exists($file_in_current_dir) && @include $file_in_current_dir)
+        {
+            require_once $path;
+
+            if (class_exists($className->toStdString())) {
+                return;
+            }
         }
 
         foreach($directories as $directory)

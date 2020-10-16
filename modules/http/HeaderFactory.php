@@ -18,15 +18,15 @@ class HeaderFactory
 
         if (qs($content)->isJson())
         {
-            header("Content-Type: application/json");
+            set_header('Content-Type', 'application/json');
         }
         elseif (qs($content)->isHtml())
         {
-            header("Content-Type: text/html");
+            set_header('Content-Type', 'text/html');
         }
         elseif (qs($content)->isXml())
         {
-            header("Content-Type: application/xml");
+            set_header('Content-Type', 'application/xml');
         }
     }
 
@@ -35,7 +35,7 @@ class HeaderFactory
      */
     public static function setCacheHitHeader($hitOrMiss)
     {
-        set_header('X-QCache', $hitOrMiss);
+        set_header('X-PageCache', $hitOrMiss);
     }
 
 
@@ -44,7 +44,7 @@ class HeaderFactory
      */
     public static function setCacheContentDateHeader($date)
     {
-        set_header('X-QCache-Date', $date);
+        set_header('X-PageCache-Date', $date);
     }
 
     /**
