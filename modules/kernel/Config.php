@@ -436,7 +436,7 @@ class Config extends Singleton
     {
         $this->hosted_app_config = $app;
         InternalPathResolver::getInstance()->updateAppRoot($this->hosted_app_config->get('dir'));
-        Autoloader::getInstance()->initDirectories();
+        Autoloader::getInstance()->addAppDirectories();
         //echo "Operating on:".$this->hosted_app_config->get('dir').PHP_EOL;
     }
 

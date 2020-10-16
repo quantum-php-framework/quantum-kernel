@@ -69,7 +69,17 @@ class Autoloader extends Singleton
 
         $this->addDirectory($ipt->lib_root, false);
 
-        $this->addAppDirectories();
+        $this->addDirectories(array(
+            $ipt->shared_app_models_root,
+            $ipt->shared_app_controllers_root,
+            $ipt->shared_app_resources_root,
+            $ipt->shared_app_services_root
+        ));
+
+        $this->addDirectories(array(
+            $ipt->system_plugins_root,
+            $ipt->getSharedAppPluginsRoot()
+        ));
 
     }
 
@@ -82,18 +92,6 @@ class Autoloader extends Singleton
 
         if (isset($ipt->app_root))
             $this->addDirectory($ipt->app_root, false);
-
-        $this->addDirectories(array(
-            $ipt->shared_app_models_root,
-            $ipt->shared_app_controllers_root,
-            $ipt->shared_app_resources_root,
-            $ipt->shared_app_services_root
-        ));
-
-        $this->addDirectories(array(
-            $ipt->system_plugins_root,
-            $ipt->getSharedAppPluginsRoot()
-        ));
 
         if (isset($ipt->app_plugins_root)) {
             $this->addDirectory($ipt->app_plugins_root);

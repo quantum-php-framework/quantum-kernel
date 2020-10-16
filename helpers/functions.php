@@ -2605,6 +2605,9 @@ if (!function_exists('deepscan'))
             if($file == '.' || $file == '..') continue;
             $dir = $base_dir.DIRECTORY_SEPARATOR.$file;
             if(is_dir($dir)) {
+                if (stripos($dir, '.git') !== false)
+                    continue;
+
                 $directories []= $dir;
                 $directories = array_merge($directories, deepscan($dir));
                 if (!empty($directories))
