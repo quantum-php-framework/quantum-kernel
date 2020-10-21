@@ -972,6 +972,36 @@ class Config extends Singleton
     }
 
 
+    /**
+     * @throws \Exception
+     */
+    public function setEnvironmentByInstance($instance)
+    {
+        $this->config_root = InternalPathResolver::getInstance()->config_root;
+
+        $cfg_file = $this->config_root.'environment.php';
+
+        if (!is_file($cfg_file))
+            trigger_error("environment.php not found in config directory", E_USER_ERROR);
+
+
+        include $cfg_file;
+
+
+        if (!isset($QUANTUM_ENVIRONMENTS))
+            trigger_error("QUANTUM_ENVIRONMENTS are not set", E_USER_ERROR);
+
+        foreach ($QUANTUM_ENVIRONMENTS as $key => $environment)
+        {
+            if ($environment['instance'] == $instance)
+            {
+                $current_env = (object)$environment;
+                $this->setEnvironment($current_env);
+                return;
+            }
+
+        }
+    }
 
 
 

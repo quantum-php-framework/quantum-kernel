@@ -2283,6 +2283,9 @@ if (! function_exists('dd')) {
             var_dump($x);
         }, func_get_args());
 
+        if (!is_cli())
+            var_dump(debug_backtrace());
+
         die(1);
     }
 }
@@ -6071,3 +6074,22 @@ if (!function_exists('validate_file')) {
 }
 
 
+if (!function_exists('request')) {
+    /**
+     * @return Quantum\Request
+     */
+    function request()
+    {
+        return Quantum\Request::getInstance();
+    }
+}
+
+if (!function_exists('qm_request')) {
+    /**
+     * @return Quantum\Request
+     */
+    function qm_request()
+    {
+        return Quantum\Request::getInstance();
+    }
+}

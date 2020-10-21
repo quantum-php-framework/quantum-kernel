@@ -275,8 +275,59 @@ class Teleport {
                 break;
 
 
-            default :
+            case "shared-plugin-migration":
+                $this->genSharedPluginMigration();
+                break;
 
+            case "app-migration":
+                $this->genAppMigration();
+                break;
+
+            case "app-plugin-migration":
+                $this->genAppPluginMigration();
+                break;
+
+
+            case "shared-plugin-seed":
+                $this->genSharedPluginSeed();
+                break;
+
+            case "app-seed":
+                $this->genAppSeed();
+                break;
+
+            case "app-plugin-seed":
+                $this->genAppPluginSeed();
+                break;
+
+
+            case "execute-app-migrations":
+                $this->executeAppMigrations();
+                break;
+
+            case "execute-app-plugin-migrations":
+                $this->executeAppPluginMigration();
+                break;
+
+            case "execute-shared-plugin-migrations":
+                $this->executeSharedPluginMigration();
+                break;
+
+
+            case "rollback-app-migrations":
+                $this->rollbackAppMigrations();
+                break;
+
+            case "rollback-app-plugin-migrations":
+                $this->rollbackAppPluginMigration();
+                break;
+
+            case "rollback-shared-plugin-migrations":
+                $this->rollbackSharedPluginMigration();
+                break;
+
+
+            default :
                 $this->error("I can't teleport that scotty !");
         }
 
@@ -410,13 +461,13 @@ class Teleport {
         define('SMARTY_DIR', $this->libs_root.'smarty/');
         define('SMARTY_SYSPLUGINS_DIR', $this->libs_root.'smarty/sysplugins/');
         define('SMARTY_PLUGINS_DIR', $this->libs_root.'smarty/plugins');
-        require_once ($this->libs_root.'smarty/Smarty.class.php');
+        require_once ($this->libs_root.'smarty/bootstrap.php');
 
-        $this->smarty = new Smarty();
+        $this->smarty = new \Smarty();
         $this->smarty ->template_dir = $this->views_root;
         $this->smarty->compile_dir =   $this->tmp_root;
-        $this->smarty->allow_php_tag = true;
-        $this->smarty->plugins_dir[] = $this->libs_root.'smarty/plugins';
+        //$this->smarty->allow_php_tag = true;
+        //$this->smarty->plugins_dir[] = $this->libs_root.'smarty/plugins';
 
     }
 
@@ -958,7 +1009,11 @@ class Teleport {
 
         $name = $this->params['name'];
 
-        $command = './../../composer/vendor/bin/phinx create '.$name;
+
+        $ipt = InternalPathResolver::getInstance();
+        $phinx = qf($ipt->quantum_root)->getSiblingFile('composer')->getChildFile('vendor/bin/phinx ');
+
+        $command = $phinx->getPath().' create '.$name;
 
         $this->output($command);
 
@@ -968,18 +1023,292 @@ class Teleport {
         $this->output('Migration generated!');
     }
 
-    private function executeMigration()
+    private function genSharedPluginMigration()
     {
-        if (isset($this->params['env']))
+        if (!isset($this->params['name']) || !isset($this->params['plugin']) )
         {
-            $environment = $this->params['env'];
-        }
-        else
-        {
-            $environment = 'development';
+            $this->error('Error: You must pass a name and a plugin to teleport a migration', false);
+            $this->error('EX: ./teleport shared-plugin-migration name=MyMigration plugin=plugin_folder will generate a migration in quantum/apps/shared/plugins/plugin_folder/migrations');
         }
 
-        $command = './../../composer/vendor/bin/phinx migrate -e '.$environment;
+        $name = $this->params['name'];
+        $plugin_folder = $this->params['plugin'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->shared_app_plugins_root)->getChildFile($plugin_folder);
+
+        $this->genMigration($name, $path);
+    }
+
+    private function genAppMigration()
+    {
+        if (!isset($this->params['name']) || !isset($this->params['app']) )
+        {
+            $this->error('Error: You must pass a name and an app to teleport a migration', false);
+            $this->error('EX: ./teleport app-migration name=MyMigration app=default will generate a migration in quantum/apps/hosted/default/migrations');
+        }
+
+        $name = $this->params['name'];
+        $app_folder = $this->params['app'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->hosted_apps_root)->getChildFile($app_folder);
+
+        $this->genMigration($name, $path);
+    }
+
+    private function genAppPluginMigration()
+    {
+        if (!isset($this->params['name']) || !isset($this->params['app']) || !isset($this->params['plugin']) )
+        {
+            $this->error('Error: You must pass a migration name an app and a plugin to teleport a migration', false);
+            $this->error('EX: ./teleport app-plugin-migration name=MyMigration app=default plugin=plugin_folder will generate a migration in quantum/apps/hosted/default/plugin_folder/migrations');
+        }
+
+        $name = $this->params['name'];
+        $app_folder = $this->params['app'];
+        $plugin_folder = $this->params['plugin'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->hosted_apps_root)->getChildFile($app_folder)->getChildFile('plugins')->getChildFile($plugin_folder);
+
+        $this->genMigration($name, $path);
+    }
+
+    private function genMigration ($class_name, $path)
+    {
+        if (!$path->isDirectory()) {
+            $this->error('Error: Migration target base path not found:'.$path->getPath(), false);
+            return;
+        }
+
+        $migrations_dir = $path->getChildFile('migrations');
+
+        if (!$migrations_dir->isDirectory()) {
+            $migrations_dir->create();
+        }
+
+        $file_name = \Phinx\Util\Util::mapClassNameToFileName($class_name);
+
+        $this->initSmarty();
+        $this->smarty->assign('migration_name', $class_name);
+
+        $content = $this->smarty->fetch($this->matter_root.'migration.tpl');
+
+        $this->createFile(ensure_last_slash($migrations_dir->getPath()), $file_name, $content);
+
+        $this->output('Migration generated!');
+    }
+
+    private function genSharedPluginSeed()
+    {
+        if (!isset($this->params['name']) || !isset($this->params['plugin']) )
+        {
+            $this->error('Error: You must pass a name and a plugin to teleport a migration', false);
+            $this->error('EX: ./teleport shared-plugin-seed name=MyMigration plugin=plugin_folder will generate a seed in quantum/apps/shared/plugins/plugin_folder/migrations/seeds');
+        }
+
+        $name = $this->params['name'];
+        $plugin_folder = $this->params['plugin'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->shared_app_plugins_root)->getChildFile($plugin_folder);
+
+        $this->genSeed($name, $path);
+    }
+
+    private function genAppSeed()
+    {
+        if (!isset($this->params['name']) || !isset($this->params['app']) )
+        {
+            $this->error('Error: You must pass a name and an app to teleport a seed', false);
+            $this->error('EX: ./teleport app-seed name=MySeed app=default will generate a seed in quantum/apps/hosted/default/migrations/seeds');
+        }
+
+        $name = $this->params['name'];
+        $app_folder = $this->params['app'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->hosted_apps_root)->getChildFile($app_folder);
+
+        $this->genSeed($name, $path);
+    }
+
+    private function genAppPluginSeed()
+    {
+        if (!isset($this->params['name']) || !isset($this->params['app']) || !isset($this->params['plugin']) )
+        {
+            $this->error('Error: You must pass a migration name an app and a plugin to teleport a seed', false);
+            $this->error('EX: ./teleport app-plugin-seed name=MySeed app=default plugin=plugin_folder will generate a seed in quantum/apps/hosted/default/plugin_folder/migrations/seeds');
+        }
+
+        $name = $this->params['name'];
+        $app_folder = $this->params['app'];
+        $plugin_folder = $this->params['plugin'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->hosted_apps_root)->getChildFile($app_folder)->getChildFile('plugins')->getChildFile($plugin_folder);
+
+        $this->genSeed($name, $path);
+    }
+
+    private function genSeed ($class_name, $path)
+    {
+        if (!$path->isDirectory()) {
+            $this->error('Error: Migration target base path not found:'.$path->getPath(), false);
+            return;
+        }
+
+        $seeds_dir = $path->getChildFile('migrations')->getChildFile('seeds');
+
+        if (!$seeds_dir->isDirectory()) {
+            $seeds_dir->create();
+        }
+
+        $file_name = \Phinx\Util\Util::mapClassNameToFileName($class_name);
+
+        $this->initSmarty();
+        $this->smarty->assign('seed_name', $class_name);
+
+        $content = $this->smarty->fetch($this->matter_root.'seed.tpl');
+
+        $this->createFile(ensure_last_slash($seeds_dir->getPath()), $file_name, $content);
+
+        $this->output('Seed generated!');
+    }
+
+    private function setConfigEnvironmentByInstance()
+    {
+        $instance = isset($this->params['env']) ? $this->params['env'] : "development";
+        \Quantum\Config::getInstance()->setEnvironmentByInstance($instance);
+    }
+
+    private function executeAppMigrations()
+    {
+        if (!isset($this->params['app']) )
+        {
+            $this->error('Error: You must pass an app folder name to execute its migrations', false);
+            $this->error('EX: ./teleport execute-app-migrations app=default will execute migrations in quantum/apps/hosted/default/migrations');
+        }
+
+        $app_folder = $this->params['app'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->hosted_apps_root)->getChildFile($app_folder)->getChildFile('migrations');
+
+        $this->setConfigEnvironmentByInstance();
+
+        $phinx = new PhinxMigrationRunner($path->getPath());
+        $phinx->executeMigrations();
+    }
+
+
+
+    private function rollbackAppMigrations()
+    {
+        if (!isset($this->params['app']) )
+        {
+            $this->error('Error: You must pass an app folder name to execute its migrations', false);
+            $this->error('EX: ./teleport rollback-app-migrations app=default will rollback migrations in quantum/apps/hosted/default/migrations');
+        }
+
+        $app_folder = $this->params['app'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->hosted_apps_root)->getChildFile($app_folder)->getChildFile('migrations');
+
+        $this->setConfigEnvironmentByInstance();
+
+        $phinx = new PhinxMigrationRunner($path->getPath());
+        $phinx->rollbackMigrations();
+    }
+
+    private function executeAppPluginMigration()
+    {
+        if (!isset($this->params['app']) || !isset($this->params['plugin']) )
+        {
+            $this->error('Error: You must pass an app and a plugin to run its migration', false);
+            $this->error('EX: ./teleport execute-app-plugin-migrations app=default plugin=plugin_folder will execute migrations in quantum/apps/hosted/default/plugin_folder/migrations');
+        }
+
+        $app_folder = $this->params['app'];
+        $plugin_folder = $this->params['plugin'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->hosted_apps_root)->getChildFile($app_folder)->getChildFile('plugins')->getChildFile($plugin_folder)->getChildFile('migrations');
+
+        $this->setConfigEnvironmentByInstance();
+
+        $phinx = new PhinxMigrationRunner($path->getPath());
+        $phinx->executeMigrations();
+    }
+
+    private function rollbackAppPluginMigration()
+    {
+        if (!isset($this->params['app']) || !isset($this->params['plugin']) )
+        {
+            $this->error('Error: You must pass an app and a plugin to rollback its migration', false);
+            $this->error('EX: ./teleport rollback-app-plugin-migrations app=default plugin=plugin_folder will rollback migrations in quantum/apps/hosted/default/plugin_folder/migrations');
+        }
+
+        $app_folder = $this->params['app'];
+        $plugin_folder = $this->params['plugin'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->hosted_apps_root)->getChildFile($app_folder)->getChildFile('plugins')->getChildFile($plugin_folder)->getChildFile('migrations');
+
+        $this->setConfigEnvironmentByInstance();
+
+        $phinx = new PhinxMigrationRunner($path->getPath());
+        $phinx->rollbackMigrations();
+    }
+
+    private function executeSharedPluginMigration()
+    {
+        if (!isset($this->params['plugin']) )
+        {
+            $this->error('Error: You must pass a plugin folder dir to execute its migration', false);
+            $this->error('EX: ./teleport execute-shared-plugin-migrations plugin=plugin_folder will execute migrations in quantum/apps/shared/plugins/plugin_folder/migrations');
+        }
+
+        $plugin_folder = $this->params['plugin'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->shared_app_plugins_root)->getChildFile($plugin_folder)->getChildFile('migrations');
+
+        $this->setConfigEnvironmentByInstance();
+
+        $phinx = new PhinxMigrationRunner($path->getPath());
+        $phinx->executeMigrations();
+    }
+
+    private function rollbackSharedPluginMigration()
+    {
+        if (!isset($this->params['plugin']) )
+        {
+            $this->error('Error: You must pass a plugin folder dir to rollback its migration', false);
+            $this->error('EX: ./teleport rollback-shared-plugin-migrations plugin=plugin_folder will rollback migrations in quantum/apps/shared/plugins/plugin_folder/migrations');
+        }
+
+        $plugin_folder = $this->params['plugin'];
+
+        $ipt = InternalPathResolver::getInstance();
+        $path = qf($ipt->shared_app_plugins_root)->getChildFile($plugin_folder)->getChildFile('migrations');
+
+        $this->setConfigEnvironmentByInstance();
+
+        $phinx = new PhinxMigrationRunner($path->getPath());
+        $phinx->rollbackMigrations();
+    }
+
+    private function executeMigration()
+    {
+        $environment = isset($this->params['env']) ? $this->params['env'] : "development";
+
+        $ipt = InternalPathResolver::getInstance();
+        $phinx = qf($ipt->quantum_root)->getSiblingFile('composer')->getChildFile('vendor/bin/phinx ');
+
+        $command = $phinx->getPath().' migrate -e '.$environment;
 
         $this->output($command);
 
@@ -991,16 +1320,12 @@ class Teleport {
 
     private function rollbackMigration()
     {
-        if (isset($this->params['env']))
-        {
-            $environment = $this->params['env'];
-        }
-        else
-        {
-            $environment = 'development';
-        }
+        $environment = isset($this->params['env']) ? $this->params['env'] : "development";
 
-        $command = './../../composer/vendor/bin/phinx rollback -e '.$environment;
+        $ipt = InternalPathResolver::getInstance();
+        $phinx = qf($ipt->quantum_root)->getSiblingFile('composer')->getChildFile('vendor/bin/phinx ');
+
+        $command = $phinx->getPath().' rollback -e '.$environment;
 
         $this->output($command);
 

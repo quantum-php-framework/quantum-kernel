@@ -3,6 +3,7 @@
 namespace Quantum\Plugins;
 
 use Quantum\HMVC\Module;
+use Quantum\PhinxMigrationRunner;
 use Quantum\Request;
 
 /**
@@ -193,4 +194,35 @@ class PlugAndPlayModule extends Module
     {
         return $this->_folder->canPluginBeLoadedByActiveApp();
     }
+
+    public function getMigrationsFolder()
+    {
+        return $this->_folder->getChildFile('migrations');
+    }
+
+    public function executeMigrations()
+    {
+        $migrations_folder = $this->getMigrationsFolder();
+
+        $m = new PhinxMigrationRunner($migrations_folder->getPath());
+        $m->executeMigrations();
+    }
+
+    public function rollbackMigrations()
+    {
+        $migrations_folder = $this->getMigrationsFolder();
+
+        $m = new PhinxMigrationRunner($migrations_folder->getPath());
+        $m->rollbackMigrations();
+    }
+
+    public function executeSeeds()
+    {
+        $migrations_folder = $this->getMigrationsFolder();
+
+        $m = new PhinxMigrationRunner($migrations_folder->getPath());
+        $m->executeSeeds();
+    }
+
+
 }

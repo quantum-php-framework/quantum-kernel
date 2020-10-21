@@ -188,4 +188,34 @@ abstract class HostedApp
         qm_profiler_stop('HostedApp::runMiddlewares');
     }
 
+    public function executeMigrations()
+    {
+        $ipt = InternalPathResolver::getInstance();
+        $app_root = $ipt->app_root;
+
+        $m = new PhinxMigrationRunner($app_root.'migrations');
+        $m->executeMigrations();
+    }
+
+    public function executeSeeds()
+    {
+        $ipt = InternalPathResolver::getInstance();
+        $app_root = $ipt->app_root;
+
+        $m = new PhinxMigrationRunner($app_root.'migrations');
+        $m->executeSeeds();
+    }
+
+    public function rollbackMigrations()
+    {
+        $ipt = InternalPathResolver::getInstance();
+        $app_root = $ipt->app_root;
+
+        $m = new PhinxMigrationRunner($app_root.'migrations');
+        $m->rollbackMigrations();
+    }
+
+
+
+
 }
