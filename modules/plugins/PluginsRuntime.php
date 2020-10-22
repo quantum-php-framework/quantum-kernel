@@ -3,8 +3,9 @@
 namespace Quantum\Plugins;
 
 use Quantum\Events\Event;
+use Quantum\Singleton;
 
-class PluginsRuntime
+class PluginsRuntime extends Singleton
 {
     /**
      * @var PluginScanner

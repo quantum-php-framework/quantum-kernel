@@ -1,8 +1,6 @@
 <?php
 
-
 namespace Quantum\Plugins;
-
 
 class PluginFolder extends \Quantum\File
 {
@@ -19,12 +17,15 @@ class PluginFolder extends \Quantum\File
 
         foreach ($files as $file)
         {
-            $headers = $this->readFileHeaders($file);
+            if (!$file->isDirectory())
+            {
+                $headers = $this->readFileHeaders($file);
 
-            if (!empty($headers['name'])) {
+                if (!empty($headers['name'])) {
 
-                $this->plugin_entry_headers = $headers;
-                return $file->getRealPath();
+                    $this->plugin_entry_headers = $headers;
+                    return $file->getRealPath();
+                }
             }
         }
 

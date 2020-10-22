@@ -254,7 +254,7 @@ class Runtime
     private function initPluginsRuntime()
     {
         if (!is_cli()) {
-            $this->plugins_runtime = new PluginsRuntime();
+            $this->plugins_runtime = PluginsRuntime::getInstance();
         }
     }
 

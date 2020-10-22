@@ -2,6 +2,8 @@
 
 namespace Quantum;
 
+use Quantum\Plugins\PluginsRuntime;
+
 require_once ("Singleton.php");
 
 /**
@@ -667,6 +669,30 @@ class InternalPathResolver extends Singleton
     public function getWebRoot()
     {
         return $this->web_root;
+    }
+
+    public function getAllEntitiesPaths()
+    {
+        $app_entities_root = $this->app_root.'entities';
+        $shared_entities_root = $this->shared_app_resources_root.'entities';
+
+        $dirs = new_vt([$app_entities_root, $shared_entities_root]);
+
+        $plugins_runtime = PluginsRuntime::getInstance();
+        $plugins = $plugins_runtime->plugins_registry;
+
+        foreach ($plugins as $plugin_meta)
+        {
+            $folder = $plugin_meta->get('folder');
+
+            $entities_folder = qf($folder)->getChildFile('entities');
+
+            if ($entities_folder->exists()) {
+                $dirs->add($entities_folder->getPath());
+            }
+        }
+
+        return $dirs->toStdArray();
     }
 
 }
