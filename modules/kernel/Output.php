@@ -1,834 +1,1024 @@
 <?php
 
-
-
 namespace Quantum;
 
 /**
- * Class Output
+ * Class Config
  * @package Quantum
  */
-class Output extends Singleton
+class Config extends Singleton
 {
 
     /**
      * @var
      */
-    public $ipt;
-    /**
-     * @var
-     */
-    public $smarty;
-    /**
-     * @var
-     */
-    public $views;
-    /**
-     * @var
-     */
-    public $mainView;
+    public $environment;
+
+    public $active_kernel_plugins_list;
+
+    public $active_app_plugins_list;
 
     /**
-     * @var bool
-     */
-    private $shouldRenderHeaderAndFooter;
-    /**
-     * @var bool
-     */
-    private $shouldCompressOutput;
-    /**
-     * @var bool
-     */
-    private $shouldTrimWhiteSpace;
-
-    /**
-     * Output constructor.
+     * Config constructor.
+     * @throws \Exception
      */
     function __construct()
     {
-        $this->shouldRenderHeaderAndFooter = true;
-        $this->shouldCompressOutput = false;
-        $this->shouldTrimWhiteSpace = false;
-        $this->initSmarty();
+        $this->domainBasedAutoEnvConfig();
+        $this->appConfigMultipleHandler();
+    }
+
+    /**
+     * @return bool
+     */
+    public function getEnvironment() {
+
+        if (!empty($this->environment)) {
+            return $this->environment;
+        }
+
+        return false;
 
     }
 
     /**
-     * @param $smarty
+     * @param $environment
      */
-    public function init($smarty)
+    public function setEnvironment($environment)
     {
-        $this->smarty = $smarty;
-        $this->views = array();
-        
+        $this->environment = $environment;
     }
+
+    /**
+     * @throws \Exception
+     */
+    public function domainBasedAutoEnvConfig()
+    {
+        $ipt = InternalPathResolver::getInstance();
+
+        $this->config_root = $ipt->config_root;
+
+        $requested_domain  = qs($_SERVER['HTTP_HOST'])->upToFirstOccurrenceOf(':');
+        $possible_env_file = qf($ipt->local_root.'environments/'.$requested_domain.'.json');
+
+        if ($possible_env_file->existsAsFile())
+        {
+            $env = \json_decode($possible_env_file->getContents());
+
+            if ($env) {
+                $this->setEnvironment($env);
+                return;
+            }
+        }
+        else
+        {
+            $cfg_file = $this->config_root.'environment.php';
+
+            if (!is_file($cfg_file))
+                trigger_error("environment.php not found in config directory", E_USER_ERROR);
+
+            require_once($cfg_file);
+        }
+
+        if (!isset($QUANTUM_ENVIRONMENTS))
+            trigger_error("QUANTUM_ENVIRONMENTS are not set", E_USER_ERROR);
+
+        if (isset($_SERVER['HTTP_HOST']))
+        {
+            $current_domain = $_SERVER['HTTP_HOST'];
+
+            $current_env = '';
+
+            foreach ($QUANTUM_ENVIRONMENTS as $key => $environment)
+            {
+                if ($environment['domain'] == $current_domain)
+                {
+                    $current_env = (object)$environment;
+                }
+            }
+
+            if (!empty($current_env)) {
+                $this->setEnvironment($current_env);
+            }
+            else if (!Request::getInstance()->isCommandLine()) {
+                Output::renderCriticalError(500);
+            }
+        }
+
+    }
+
+    /**
+     * This will attempt to load an app through multiple handlers
+     * See Quantum docs article: Single or Multiple Apps.
+     * @throws \Exception
+     */
+    private function appConfigMultipleHandler()
+    {
+        $r = $this->teleportAppConfigAttempt();
+
+        if ($r->wasOk())
+            return;
+
+        $r = $this->kernelConfigDefaultAppConfigAttempt();
+
+        if ($r->wasOk())
+            return;
+
+        $r = $this->domainBasedAutoAppConfigAttempt();
+
+        if ($r->wasOk())
+            return;
+
+        $r = $this->kernelConfigFallbackAppConfigAttempt();
+
+        if ($r->wasOk())
+            return;
+
+        $r = $this->kernelConfigCLIAppConfigAttempt();
+
+        if ($r->wasOk())
+            return;
+
+        if (!Request::getInstance()->isCommandLine())
+            throw_exception('No app config handler found');
+    }
+
+    /**
+     * @param $uri
+     * @return bool|mixed
+     * @throws \Exception
+     */
+    private function findHostedAppConfig($uri)
+    {
+        $apps = $this->getHostedApps();
+
+        if (empty($apps))
+        {
+            throw_exception("No hosted apps found");
+        }
+
+        foreach ($apps as $app)
+        {
+            if ($app['uri'] == $uri)
+            {
+                return $app;
+            }
+        }
+
+        return false;
+    }
+
 
     /**
      *
      */
-    public function initSmarty()
+    public function domainBasedAutoAppConfigAttempt()
     {
-        $this->ipt = InternalPathResolver::getInstance();
+        if (Request::getInstance()->isCommandLine())
+            return Result::fail();
 
-        assert(!empty($this->ipt));
+        if (!isset($_SERVER["HTTP_HOST"]))
+            return Result::fail();
 
-        define('SMARTY_DIR', $this->ipt->lib_root.'smarty/');
-        define('SMARTY_SYSPLUGINS_DIR', $this->ipt->lib_root.'smarty/sysplugins/');
-        define('SMARTY_PLUGINS_DIR', $this->ipt->lib_root.'smarty/plugins/');
-        require_once ($this->ipt->lib_root.'smarty/bootstrap.php');
-        
-        $this->smarty = new \Smarty();
-        $this->smarty ->template_dir = $this->ipt->views_root;
-        $this->smarty->compile_dir =   $this->ipt->tmp_root;
-        //$this->smarty->allow_php_tag = true;
-        //$this->smarty->plugins_dir[] = $this->ipt->lib_root.'smarty/plugins';
+        $urlParts = explode('.', $_SERVER["HTTP_HOST"]);
 
-        //$this->set('QM_Client', Client::getInstance());
-        //$this->set('QM_Environment', Config::getInstance()->getEnvironment());
-        
-        //\Quantum::setSmarty($this->smarty);
-        //var_dump($this->smarty);
-        //var_dump($this);
-    }
+        if (empty($urlParts))
+            return Result::fail();
 
+        $subdomain_value = $urlParts[0];
 
-    /**
-     * @param $view
-     */
-    public function renderView($view) {
-        
-       $this->display($this->ipt->views_root.$view);
-    }
+        $config = $this->findHostedAppConfig($subdomain_value);
 
-    /**
-     * @param $shouldCompress
-     */
-    public function setCompressOutput($shouldCompress)
-    {
-        $this->shouldCompressOutput = $shouldCompress;
-    }
-
-    /**
-     * @param $shouldTrim
-     */
-    public function setTrimWhiteSpace($shouldTrim)
-    {
-        $this->shouldTrimWhiteSpace = $shouldTrim;
-    }
-
-    /**
-     * @param $controller
-     * @param $task
-     */
-    public function setMainView($controller, $task) {
-        
-        if (empty($controller)) {
-            
-            $controller = 'index';
+        if (!empty($config))
+        {
+            $this->setAppConfig($config);
+            return Result::ok();
         }
-       
-        $this->mainView = "$controller/$task.tpl";
-     
+
+        return Result::fail();
     }
 
     /**
-     * @param $view
+     * @return Result
      */
-    public function resetMainView($view) {
-        $this->mainView = $view;
-    }
-
-
-    /**
-     * @param $var_name
-     * @param $var_content
-     */
-    public function set($var_name, $var_content)
+    private function kernelConfigDefaultAppConfigAttempt()
     {
-        $this->smarty->assign($var_name, $var_content);
+        if (Request::getInstance()->isCommandLine())
+            return Result::fail();
+
+        return $this->attemptConfigBasedOnKernelConfigValue('default_app');
     }
 
     /**
-     * @param $var_name
+     * @return Result
      */
-    public function unassign($var_name)
+    private function kernelConfigFallbackAppConfigAttempt()
     {
-        $this->smarty->clearAssign($var_name);
+        if (Request::getInstance()->isCommandLine())
+            return Result::fail();
+
+        return $this->attemptConfigBasedOnKernelConfigValue('fallback_app');
+    }
+
+    /**
+     * @return Result
+     */
+    private function kernelConfigCLIAppConfigAttempt()
+    {
+        if (!Request::getInstance()->isCommandLine())
+            return Result::fail();
+
+        return $this->attemptConfigBasedOnKernelConfigValue('cli_app');
+    }
+
+
+    /**
+     * @return Result
+     * @throws \Exception
+     */
+    private function teleportAppConfigAttempt()
+    {
+        if (!isset($_ENV["QM_TELEPORT_SERVER_APP"]))
+            return Result::fail();
+
+        $env_app = $_ENV["QM_TELEPORT_SERVER_APP"];
+
+        if (empty($env_app))
+            return Result::fail();
+
+        $config = $this->findHostedAppConfig($env_app);
+
+        if (!empty($config))
+        {
+            $this->setAppConfig($config);
+            return Result::ok();
+        }
+
+        return Result::fail();
+    }
+
+
+    /**
+     * @param $value
+     * @return Result
+     * @throws \Exception
+     */
+    private function attemptConfigBasedOnKernelConfigValue($value)
+    {
+        $kernelConfig = $this->getKernelConfig();
+
+        if (!empty($kernelConfig) && $kernelConfig->has($value))
+        {
+            $config = $this->findHostedAppConfig($kernelConfig->get($value));
+
+            if (!empty($config))
+            {
+                $this->setAppConfig($config);
+                return Result::ok();
+            }
+        }
+
+        return Result::fail();
+    }
+
+
+
+    /**
+     * @return ValueTree
+     */
+    public function getGlobalRoutes()
+    {
+        $this->config_root = InternalPathResolver::getInstance()->config_root;
+
+        require_once($this->config_root.'routes.php');
+
+        if (isset($QUANTUM_CONTROLLER_ROUTES) && empty($this->controller_routes))
+        {
+            $this->controller_routes = new_vt();
+
+            foreach ($QUANTUM_CONTROLLER_ROUTES as $key => $app)
+            {
+                $QUANTUM_CONTROLLER_ROUTES[$key] = new_locked_vt($app);
+            }
+
+            $this->controller_routes->replaceProperties($QUANTUM_CONTROLLER_ROUTES);
+        }
+
+        return $this->controller_routes;
+    }
+
+
+    /**
+     * @return ValueTree
+     */
+    public function getActiveAppRoutes()
+    {
+        return $this->getApprovedAppRoutes();
+    }
+
+
+    /**
+     * @param $uri
+     * @return bool|mixed
+     */
+    public function getRouteForUri($uri)
+    {
+        //$routes = $this->getApprovedAppRoutes();
+
+
+        $routes = RoutesRegistry::getInstance()->getRoutes();
+
+        if (empty($routes))
+            return false;
+
+        foreach ($routes as $route)
+        {
+            $route_uri = $route->get('uri');
+
+            if (str_contains($route_uri, "*"))
+            {
+                $route_uri = str_replace("*", "", $route_uri);
+
+                if (starts_with($uri, $route_uri))
+                    return $route;
+            }
+
+            if ($uri == $route_uri)
+                return $route;
+        }
+
+        $possible_route = dispatch_event('route_not_found');
+
+        if ($possible_route)
+            return $possible_route;
+
+        return false;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getHostedApps()
+    {
+        if (empty($this->hosted_apps))
+        {
+            $this->config_root = InternalPathResolver::getInstance()->config_root;
+
+            require_once($this->config_root.'apps.php');
+
+            if (isset($QUANTUM_HOSTED_APPS))
+            {
+                foreach ($QUANTUM_HOSTED_APPS as $key => $app)
+                {
+                    $QUANTUM_HOSTED_APPS[$key] = new_locked_vt($app);
+                }
+
+                $this->hosted_apps = $QUANTUM_HOSTED_APPS;
+
+            }
+        }
+
+        return $this->hosted_apps;
+    }
+
+    /**
+     * @return ValueTree
+     */
+    public function getApprovedAppRoutes()
+    {
+        if (empty($this->approved_app_routes))
+        {
+            $this->config_root = InternalPathResolver::getInstance()->app_config_root;
+
+            require_once(qf($this->config_root . 'routes.php')->getRealPath());
+
+            if (isset($QUANTUM_APP_ROUTES))
+            {
+                $this->approved_app_routes = new_vt();
+
+                foreach ($QUANTUM_APP_ROUTES as $key => $app)
+                {
+                    $QUANTUM_APP_ROUTES[$key] = new_locked_vt($app);
+                }
+
+                $this->approved_app_routes->replaceProperties($QUANTUM_APP_ROUTES);
+            }
+
+        }
+
+        return $this->approved_app_routes;
+    }
+
+
+    /**
+     * @param $uri
+     * @return bool
+     */
+    public function hasHostedApp($uri)
+    {
+        $apps = $this->getHostedApps();
+
+        foreach ($apps as $app)
+        {
+            if ($app['uri'] == $uri)
+                return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param $uri
+     * @return mixed|null
+     */
+    public function getHostedApp($uri)
+    {
+        $apps = $this->getHostedApps();
+
+        foreach ($apps as $app)
+        {
+            if ($app['uri'] == $uri)
+                return $app;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param ValueTree $app
+     */
+    public function setAppConfig(ValueTree $app)
+    {
+        $this->hosted_app_config = $app;
+        InternalPathResolver::getInstance()->updateAppRoot($this->hosted_app_config->get('dir'));
+        Autoloader::getInstance()->addAppDirectories();
+        //echo "Operating on:".$this->hosted_app_config->get('dir').PHP_EOL;
+    }
+
+    /**
+     * @return Database
+     */
+    public function getDatabase()
+    {
+        if (!isset($this->database))
+            $this->database = new Database($this->environment->db_name, $this->environment->db_host, $this->environment->db_user, $this->environment->db_password);
+
+        return $this->database;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getEnvironmentInstance()
+    {
+        return $this->environment->instance;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getEnvironmentDomain()
+    {
+        return $this->environment->domain;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getPath()
+    {
+        return $this->environment->path;
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getSystemSalt()
+    {
+        return $this->environment->system_salt;
+    }
+
+    /**
+     * @return bool
+     */
+    public function getHostedAppConfig()
+    {
+        if (!empty($this->hosted_app_config))
+            return $this->hosted_app_config;
+
+        return false;
     }
 
     /**
      * @param $key
      * @param bool $fallback
+     * @return mixed
+     */
+    public function getHostedAppProperty($key, $fallback = false)
+    {
+        return $this->hosted_app_config->get($key, $fallback);
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getHostedAppUri()
+    {
+        return $this->getHostedAppProperty('uri');
+    }
+
+    /**
+     * @return mixed
+     */
+    public function getHostedAppDir()
+    {
+        return $this->getHostedAppProperty('dir');
+    }
+
+    /**
+     * @return bool|mixed
+     */
+    public function getActiveAppName()
+    {
+        return $this->getActiveAppConfig()->get('name');
+    }
+
+    /**
+     * @return bool|mixed
+     */
+    public function getActiveAppDeveloper()
+    {
+        return $this->getActiveAppConfig()->get('developer');
+    }
+
+    /**
+     * @return bool|mixed
+     */
+    public function getActiveAppSharedSecret()
+    {
+        return $this->getActiveAppConfig()->get('shared_secret');
+    }
+
+    /**
+     * @return ValueTree
+     */
+    public function getActiveAppConfig()
+    {
+        if (empty($this->private_app_config))
+        {
+            $uri = InternalPathResolver::getInstance()->app_config_root;
+
+            $file = $uri."config.php";
+
+            if (!file_exists($file))
+                throw new \RuntimeException("File not found: ". $file);
+
+            require_once($file);
+
+            if (isset($QUANTUM_APP_CONFIG))
+            {
+                $this->private_app_config = new_vt($QUANTUM_APP_CONFIG);
+            }
+        }
+
+        return $this->private_app_config;
+    }
+
+    /**
+     * @return ValueTree
+     */
+    public function getSystemEncryptionKeys()
+    {
+        if (empty($this->system_encryption_keys))
+        {
+            $configDir = new File(InternalPathResolver::getInstance()->config_root);
+
+            $keysFile = $configDir->getChildFile("keys.json");
+
+            if (!$keysFile->exists())
+                throw new \RuntimeException("File not found: ". $keysFile->getPath());
+
+            $keys = $keysFile->loadAsJson();
+            if (!empty($keys))
+                $this->system_encryption_keys = new_vt($keys);
+
+        }
+
+        return $this->system_encryption_keys;
+    }
+
+    /**
+     * @return bool|mixed
+     */
+    public function getMasterEncryptionKey()
+    {
+        $keys = $this->getSystemEncryptionKeys();
+
+        if (!empty($keys))
+            return $keys->get('master_encryption_key');
+
+        return false;
+    }
+
+    /**
+     * @return bool|mixed
+     */
+    public function getPublicRsaKey()
+    {
+        $keys = $this->getSystemEncryptionKeys();
+
+        if (!empty($keys))
+            return $keys->get('public_encrypted_rsa_key');
+
+        return false;
+    }
+
+    /**
+     * @return bool|mixed
+     */
+    public function getPrivateRsaKey()
+    {
+        $keys = $this->getSystemEncryptionKeys();
+
+        if (!empty($keys))
+            return $keys->get('private_encrypted_rsa_key');
+
+        return false;
+    }
+
+
+    /**
+     * @return ValueTree
+     */
+    public function getKernelConfig()
+    {
+        if (empty($this->kernel_config))
+        {
+            $uri = InternalPathResolver::getInstance()->config_root;
+
+            $file = $uri."config.php";
+
+            if (!file_exists($file))
+                throw new \RuntimeException("File not found: ". $file);
+
+            require_once($file);
+
+            if (isset($QUANTUM_KERNEL_CONFIG))
+            {
+                $this->kernel_config = new_vt($QUANTUM_KERNEL_CONFIG);
+            }
+        }
+
+        return $this->kernel_config;
+    }
+
+    /**
+     * @return bool|mixed
+     */
+    public function getCurrentRoute()
+    {
+        if (empty($this->current_route))
+        {
+            $uri = Request::getInstance()->getUri();
+
+            $uri = $this->checkForIdInUriAndTokenize($uri);
+
+            $route = $this->getRouteForUri($uri);
+
+            if (empty($route))
+                return false;
+
+            if ($route->has('templates'))
+                $route = $this->mergeWithRouteTemplates($route);
+
+            $this->current_route = $route;
+        }
+
+        return $this->current_route;
+    }
+
+    private function mergeWithRouteTemplates(ValueTree $route)
+    {
+        $new_route = new_vt($route->toStdArray());
+
+        $templates = new_vt(include InternalPathResolver::getInstance()->getRouteTemplatesFile());
+
+        $templates_to_apply = explode('|', $route->get('templates'));
+
+        foreach ($templates_to_apply as $template_to_apply)
+        {
+            if ($templates->has($template_to_apply))
+            {
+                $template = $templates->get($template_to_apply);
+
+                $new_route->setProperties($template);
+            }
+        }
+
+        $new_route->remove('templates');
+        $new_route->setUnmutable(true);
+        $new_route->setLocked(true);
+
+        return $new_route;
+    }
+
+    /**
+     * @param $uri
+     * @return QString
+     */
+    private function checkForIdInUriAndTokenize($uri)
+    {
+        $request = Request::getInstance();
+
+        $id = $request->findId();
+
+        $uri = qs($uri)->replace($id, '{id}');
+
+        return $uri->toStdString();
+    }
+
+    /**
      * @return bool
      */
-    public function getAssignedParam($key, $fallback = false)
+    public function isCurrentRouteWildcard()
     {
-        $vars = $this->smarty->getTemplateVars();
+        $uri = $this->getCurrentRouteUri();
 
-        if (array_key_exists($key, $vars))
-            return $vars[$key];
+        if (empty($uri))
+            return false;
+
+        return qs($uri)->contains('*');
+    }
+
+    /**
+     * @return bool
+     */
+    public function currentRouteRequiresId()
+    {
+        $uri = $this->getCurrentRouteUri();
+
+        if (empty($uri))
+            return false;
+
+        return qs($uri)->contains('{id}');
+    }
+
+    /**
+     * @return bool|mixed
+     */
+    public function getCurrentRouteUri()
+    {
+        if (empty($this->current_route_uri))
+        {
+            $route = $this->getCurrentRoute();
+
+            if (empty($route))
+                return false;
+
+            $this->current_route_uri = $route['uri'];
+        }
+
+        return $this->current_route_uri;
+    }
+
+    /**
+     * @return bool
+     */
+    public function getCurrentRouteMinAccessLevel()
+    {
+        $route = $this->getCurrentRoute();
+
+        if ($route === false)
+            return false;
+
+        return $route->get('min_access_level', false);
+    }
+
+    /**
+     * @return bool
+     */
+    public function getCurrentRouteMaxAccessLevel()
+    {
+        $route = $this->getCurrentRoute();
+
+        if ($route === false)
+            return false;
+
+        return $route->get('max_access_level', false);
+    }
+
+    /**
+     * @return array|bool
+     */
+    public function getCurrentRouteStrictAccessLevels()
+    {
+        $route = $this->getCurrentRoute();
+
+        if ($route === false)
+            return false;
+
+        if ($route->has('strict_access_levels'))
+        {
+            $levels = $route->get('strict_access_levels');
+            return qs($levels)->explode(',');
+        }
+
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isCurrentRoutePublic()
+    {
+        $level = qs($this->getCurrentRouteMinAccessLevel());
+
+        if ($level->isNotEmpty() && $level->equals('public'))
+            return true;
+
+        return false;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isProductionEnvironment()
+    {
+        return $this->environment->instance === 'production';
+    }
+
+    /**
+     * @return bool
+     */
+    public function isDevelopmentEnvironment()
+    {
+        return $this->environment->instance === 'development';
+    }
+
+    public static function getKernelSetting($key, $fallback = false)
+    {
+        $config = self::getInstance()->getKernelConfig();
+
+        if (is_vt($config)) {
+            return $config->get($key, $fallback);
+        }
 
         return $fallback;
     }
 
 
-    /**
-     * @param $layout_directory_name
-     * @return bool
-     */
-    public function setTemplate($layout_directory_name) {
-        
-        if ($layout_directory_name) {
-            $this->template = $layout_directory_name;
-            return true;
-        }
-        
-            return false;
-        
-    }
+    public static function getHostedAppSetting($key, $fallback = false)
+    {
+        $config = self::getInstance()->getHostedAppConfig();
 
-    /**
-     * @param $controller
-     * @param $task
-     * @return bool
-     */
-    public function setView($controller, $task) {
-        
-        if (empty($controller)) {
-            $controller = 'index';
+        if (is_vt($config)) {
+            return $config->get($key, $fallback);
         }
 
-        if (!isset($this->views)) {
-            $this->views = array();
+        return $fallback;
+    }
+
+    public static function getActiveAppSetting($key, $fallback = false)
+    {
+        $config = self::getInstance()->getActiveAppConfig();
+
+        if (is_vt($config)) {
+            return $config->get($key, $fallback);
         }
-        
-        $view = "$controller/$task.tpl";
-        
-        
-        array_push($this->views, $view);
-        
-       
-        return true;
 
+        return $fallback;
     }
 
-    /**
-     *
-     */
-    public function clearViews()
+
+    public static function getCurrentRouteSetting($key, $fallback = false)
     {
-        $this->views = array();
+        $config = self::getInstance()->getCurrentRoute();
+
+        if (is_vt($config)) {
+            return $config->get($key, $fallback);
+        }
+
+        return $fallback;
     }
 
-
-    /**
-     *
-     */
-    public function renderTemplateNow() {
-        
-        
-        
-    }
-
-    /**
-     * @param $controller
-     */
-    public function setActiveController($controller)
+    public static function getCurrentEnvironmentSetting($key, $fallback = false)
     {
-        $this->activeController = $controller;
-    }
+        $env = self::getInstance()->getEnvironment();
 
-    /**
-     * @return mixed
-     */
-    public function getActiveController()
-    {
-        return $this->activeController;
-    }
-
-
-    /**
-     * @param $shouldRender
-     */
-    public function setShouldRenderFullTemplate($shouldRender)
-    {
-        $this->shouldRenderHeaderAndFooter = $shouldRender;
-    }
-
-
-    /**
-     *
-     */
-    public function renderFullTemplate() {
-        //var_dump($this);
-
-        if (!isset($this->activeController->smarty))
-            return;
-
-        if (empty($this->activeController->template) && !empty($this->template))
+        if (is_object($env))
         {
-            $this->activeController->template = $this->template;
+            if (isset($env->$key))
+                return $env->$key;
         }
 
-        if (!empty($this->activeController->template))
-        {
-            $this->smarty->assign('current_views_dir', $this->getViewDirInCurrentTemplate()."/".$this->activeController->controller."/");
-            $this->smarty->assign('cvd', $this->getViewDirInCurrentTemplate()."/".$this->activeController->controller."/");
-            
-            $header = $this->activeController->template."/layout/header.tpl";
-            $footer = $this->activeController->template."/layout/footer.tpl";
-
-            if ($this->activeController->renderFullTemplate)
-            {
-                if ($this->shouldRenderHeaderAndFooter)
-                {
-                    if (qf($this->ipt->templates_root.$header)->existsAsFile())
-                        $this->display($this->ipt->templates_root.$header);
-                }
-
-            }
-
-            if (!empty($this->mainView))
-            {
-                $main_view_file = qs($this->mainView)->toLowerCase()->toStdString();
-                $view_in_template = $this->getViewInCurrentTemplate($main_view_file);
-
-                if (!$view_in_template)
-                {
-                    $route = get_current_route();
-
-                    if ($route->has('from_plugin'))
-                    {
-                        $plugin_dir = $route->get('from_plugin_dir');
-
-                        $file = qf($plugin_dir)->getChildFile('views/'.$main_view_file);
-
-                        if ($file->existsAsFile()) {
-                            $this->display($file->getRealPath());
-                        } else
-                        {
-                            throw_exception('no file:'.$file->getPath());
-                        }
-                    }
-                }
-                else
-                {
-                    $this->display($view_in_template);
-                }
-            }
-            elseif (!empty($this->views))
-            {
-                $this->renderViews();
-            }
-
-            if ($this->activeController->renderFullTemplate)
-            {
-                if ($this->shouldRenderHeaderAndFooter)
-                {
-                    if (qf($this->ipt->templates_root.$footer)->existsAsFile())
-                        $this->display($this->ipt->templates_root . $footer);
-                }
-
-            }
-            
-        }
-        
-        elseif (!empty($this->mainView))
-        {
-            $this->display($this->getViewInCurrentTemplate($this->mainView));
-        }
-        
-        elseif (!empty($this->views))
-        {
-            foreach($this->views as $view)
-            {
-                //var_dump($this);
-                $this->display($this->getViewInCurrentTemplate($view));
-            }
-        }
-        
+        return $fallback;
     }
 
-    /**
-     *
-     */
-    private function renderViews() {
-        foreach($this->views as $view)
-        {
-            $view_file = qs($view)->toLowerCase()->toStdString();
-            $view_in_template = $this->getViewInCurrentTemplate($view_file);
 
-            if ($view_in_template && qf($view_in_template)->existsAsFile())
-            {
-                $this->display($view_in_template);
-            }
-            else
-            {
-                $route = get_current_route();
-
-                if ($route->has('from_plugin'))
-                {
-                    $plugin_dir = $route->get('from_plugin_dir');
-
-                    $file = qf($plugin_dir)->getChildFile('views/'.$view_file);
-
-                    if ($file->existsAsFile()) {
-                        $this->display($file->getRealPath());
-                    }
-                    else
-                    {
-                        throw_exception('no file:'.$file->getPath());
-                    }
-                }
-            }
-        }
-    }
-
-    /**
-     *
-     */
-    public function render() {
-        
-       if ($this->activeController->autoRender == true) {
-           $this->renderFullTemplate();
-        }
-      
-        
-    }
-
-    /**
-     * @param $view
-     */
-    public function overrideMainView($view) {
-        
-        $this->mainView = $view;
-        
-    }
-
-    /**
-     * @param $template
-     */
-    public function overrideTemplate($template)
+    public function getEnabledKernelPlugins()
     {
-        $this->override_template = $template;
+        if (!isset($this->active_kernel_plugins_list))
+        {
+            $this->active_kernel_plugins_list = [];
+
+            $file = $this->getEnabledKernelPluginsFile();
+
+            if ($file) {
+                $this->active_kernel_plugins_list = $file->getList();
+            }
+        }
+
+        return $this->active_kernel_plugins_list;
     }
 
-    /**
-     * @return string
-     */
-    public function getViewDirInCurrentTemplate()
+
+    public function getEnabledActiveAppPlugins()
     {
-        $template = $this->activeController->template;
+        if (!isset($this->active_app_plugins_list))
+        {
+            $this->active_app_plugins_list = [];
 
-        if (isset($this->override_template))
-            $template = $this->override_template;
+            $file = $this->getEnabledActiveAppPluginsFile();
 
-        $dir = $this->ipt->templates_root."/".$template."/views/";
+            if ($file) {
+                $this->active_app_plugins_list = $file->getList();
+            }
+        }
 
-        return $dir;
+        return $this->active_app_plugins_list;
+    }
+
+    public function getEnabledKernelPluginsFile()
+    {
+        $ipt = InternalPathResolver::getInstance();
+        $settings_file = qf($ipt->config_root.'plugins.php');
+
+        if ($settings_file->existsAsFile()) {
+            return new \Quantum\Plugins\EnabledPluginsListFile($settings_file->getRealPath());
+        }
+
+        return false;
+    }
+
+    public function getEnabledActiveAppPluginsFile()
+    {
+        $ipt = InternalPathResolver::getInstance();
+        $settings_file = qf($ipt->app_config_root.'plugins.php');
+
+        if ($settings_file->existsAsFile()) {
+            return new \Quantum\Plugins\EnabledPluginsListFile($settings_file->getRealPath());
+        }
+
+        return false;
+    }
+
+
+    public function getKernelAndActiveAppPlugins()
+    {
+        if (!isset($this->all_active_plugins_list))
+        {
+            $kernel_plugins = $this->getEnabledKernelPlugins();
+            $app_plugins = $this->getEnabledActiveAppPlugins();
+
+            $this->all_active_plugins_list = array_merge($kernel_plugins, $app_plugins);
+        }
+
+        return $this->all_active_plugins_list;
     }
 
 
     /**
-     * @param $path
-     * @return mixed
      * @throws \Exception
      */
-    public function fetch($path)
+    public function setEnvironmentByInstance($instance)
     {
-        $f = qf(realpath($path));
+        $this->config_root = InternalPathResolver::getInstance()->config_root;
 
-        if (!$f->existsAsFile())
-            throw new \Exception('Template file not found:'.$f->getPath());
+        $cfg_file = $this->config_root.'environment.php';
 
-        return $this->smarty->fetch($f->getPath());
-    }
-
-    /**
-     * @param $template
-     * @param $view
-     * @return mixed
-     * @throws \Exception
-     */
-    public function fetchFromTemplate($template, $view)
-    {
-        $dir = $this->ipt->templates_root."/".$template."/views/";
-
-        $file = $dir.$view;
-
-        $f = qf(realpath($file));
-
-        if (!$f->existsAsFile())
-            throw new \Exception('Template file not found:'.$f->getPath());
-
-        return $this->smarty->fetch($f->getPath());
-    }
-
-    /**
-     * @param $template
-     * @param $view
-     * @return mixed
-     * @throws \Exception
-     */
-    public function fetchFromTemplateLayout($template, $view)
-    {
-        $dir = $this->ipt->templates_root."/".$template."/layout/";
-
-        $file = $dir.$view;
-
-        $f = qf(realpath($file));
-
-        if (!$f->existsAsFile())
-            throw new \Exception('Template file not found:'.$f->getPath());
-
-        return $this->smarty->fetch($f->getPath());
-    }
-
-    /**
-     * @param $page_title
-     * @param null $create_link
-     */
-    public function setGenericTableView($page_title, $create_link = null, $create_link_title = null)
-    {
-        $this->set('page_title', $page_title);
-        $this->set('create_link', $create_link);
-        $this->set('create_link_title', $create_link_title);
-        $this->mainView = '../generic_views/table.tpl';
-    }
-
-    /**
-     * @param $page_title
-     */
-    public function setGenericFormView($page_title)
-    {
-        $this->set('page_title', $page_title);
-        $this->mainView = '../generic_views/form.tpl';
-    }
+        if (!is_file($cfg_file))
+            trigger_error("environment.php not found in config directory", E_USER_ERROR);
 
 
-    /**
-     * @param $view
-     * @return bool|string
-     */
-    public function getViewInCurrentTemplate($view)
-    {
-        $view = $this->getViewDirInCurrentTemplate().$view;
+        include $cfg_file;
 
-        return realpath($view);
-    }
 
-    /**
-     * @param $view
-     * @return string
-     */
-    public function getMailViewInCurrentTemplate($view)
-    {
-        $view = $this->getViewDirInCurrentTemplate()."mails/".$view;
+        if (!isset($QUANTUM_ENVIRONMENTS))
+            trigger_error("QUANTUM_ENVIRONMENTS are not set", E_USER_ERROR);
 
-        return $view;
-    }
-
-    /**
-     * @param $view
-     * @return string
-     */
-    public function getErrorViewInCurrentTemplate($view)
-    {
-        $view = $this->getViewDirInCurrentTemplate()."errors/".$view.".tpl";
-
-        return $view;
-    }
-
-    /**
-     * @param $view
-     * @return string
-     */
-    public function getGenericViewInCurrentTemplate($view)
-    {
-        $view = $this->getViewDirInCurrentTemplate()."generic_views/".$view.".tpl";
-
-        return $view;
-    }
-
-    /**
-     * @param $html
-     */
-    public static function outputHTML($html)
-    {
-        header("Content-Type: text/html");
-        header("Cache-Control: no-store");
-        header("Pragma: no-cache");
-
-        echo $html;
-        exit();
-    }
-
-    /**
-     * @param $xml
-     */
-    public static function outputXML($xml)
-    {
-        header("Content-Type: application/xml");
-        header("Cache-Control: no-store");
-        header("Pragma: no-cache");
-
-        echo $xml;
-        exit();
-    }
-
-    /**
-     * @param $xml
-     */
-    public static function outputJson($json)
-    {
-        if (is_array($json))
-            $json = json_encode($json);
-
-        if (is_vt($json))
-            $json = $json->toJson();
-
-        header("Content-Type: application/json");
-        header("Cache-Control: no-store");
-        header("Pragma: no-cache");
-
-        echo $json;
-        exit();
-    }
-
-    /**
-     * @param $json
-     */
-    public function json($json)
-    {
-        self::outputJson($json);
-    }
-
-    /**
-     * @param $xml
-     */
-    public function xml($xml)
-    {
-        self::outputXML($xml);
-    }
-
-    /**
-     * @param $xml
-     */
-    public function html($html_contents)
-    {
-        self::outputHTML($html_contents);
-    }
-
-    /**
-     * @param $valuetree
-     */
-    public function valueTreeAsJson($valuetree)
-    {
-        self::outputJson($valuetree->toJson());
-    }
-
-    /**
-     * @param $properties
-     */
-    public function addProperties($properties)
-    {
-        foreach ($properties as $key => $property)
+        foreach ($QUANTUM_ENVIRONMENTS as $key => $environment)
         {
-            $this->set($key, $property);
-        }
-    }
-
-    /**
-     * @param $file
-     */
-    public static function pushFile($file)
-    {
-        if (!file_exists($file))
-            ApiException::resourceNotFound();
-
-        header('Content-Description: File Transfer');
-        header('Content-Type: ' . mime_content_type($file));
-        header('Content-Disposition: inline; filename="'.basename($file).'"');
-        header('Expires: 0');
-        header('Cache-Control: must-revalidate');
-        header('Pragma: public');
-        header('Content-Length: ' . filesize($file));
-        readfile($file);
-        exit;
-
-    }
-
-    /**
-     * @param $string
-     * @param $filename
-     * @param $mime_type
-     */
-    public function pushFileFromString($string, $filename, $mime_type)
-    {
-        header('Content-Description: File Transfer');
-        header('Content-Type: ' . $mime_type);
-        header('Content-Disposition: attachment; filename="'.basename($filename).'"');
-        header('Expires: 0');
-        header('Cache-Control: must-revalidate');
-        header('Pragma: public');
-        header('Content-Length: ' . strlen($string));
-        echo $string;
-        exit;
-
-    }
-
-    /**
-     * @param $type
-     */
-    public function displaySystemError($type, $additional_message = '')
-    {
-        if ($type == '404')
-        {
-            http_response_code(404);
-            header('HTTP/1.0 404 Not Found');
-        }
-
-        $e = new \Exception;
-        $error_msg = $e->getTraceAsString();
-
-        if (Config::getInstance()->isProductionEnvironment()) {
-            \ExternalErrorLoggerService::info($type, [
-                'url' => Request::getPublicURL(),
-                'request' => json_encode($_REQUEST),
-                'post' => json_encode($_POST),
-                'msg' => $error_msg,
-                'data' => $additional_message]);
-        }
-
-        $e = new \Exception;
-        $error_msg = $e->getTraceAsString();
-
-        Logger::custom($error_msg, 'all_production_errors');
-
-        $location = $this->ipt->system_error_templates_root;
-
-        $file = $location.$type.".tpl";
-
-        $this->display($file);
-
-        Kernel::shutdown();
-    }
-
-    /**
-     * @param $type
-     * @return mixed
-     */
-    public function fetchSystemMailView($type)
-    {
-        $location = $this->ipt->system_mails_root;
-
-        $file = $location.$type.".tpl";
-
-        return $this->smarty->fetch($file);
-    }
-
-    /**
-     * @param $type
-     */
-    public function displayAppError($type)
-    {
-        if ($type == '404')
-        {
-            http_response_code(404);
-            header('HTTP/1.0 404 Not Found');
-        }
-
-        $config = Config::getInstance();
-
-        $appConfig = $config->getActiveAppConfig();
-
-
-        if ($appConfig->has('default_template'))
-        {
-            $template = $appConfig->get('default_template');
+            if ($environment['instance'] == $instance)
+            {
+                $current_env = (object)$environment;
+                $this->setEnvironment($current_env);
+                return;
+            }
 
         }
-
-        if (empty($template))
-            $this->displaySystemError($type);
-
-        $dir = qf($this->ipt->templates_root."/".$template."/errors/");
-
-        $location = $dir->getChildFile($type.".tpl");
-
-        if (!$location->exists())
-            $this->displaySystemError($type);
-
-        $this->set('config', $appConfig);
-        $this->display($location->getRealPath());
-        Kernel::shutdown();
     }
 
-    /**
-     *
-     */
-    public function display404()
-    {
-        if (Config::getInstance()->isProductionEnvironment())
-            \ExternalErrorLoggerService::info('Route not found', ['url' => Request::getPublicURL(), 'request' => json_encode($_REQUEST), 'post' => json_encode($_POST)]);
 
-        $this->displayAppError('404');
-    }
 
-    /**
-     * @param $path
-     */
-    private function display($path)
-    {
-        $path = realpath($path);
 
-        if ($this->shouldTrimWhiteSpace)
-        {
-            $this->smarty->loadFilter('output', 'trimwhitespace');
-        }
-
-        if ($this->shouldCompressOutput)
-        {
-            $this->smarty->loadFilter('output', 'compress');
-        }
-
-        $this->smarty->display($path);
-    }
-
-    /**
-     * @param $string
-     */
-    public function setHeader($string)
-    {
-        header($string);
-    }
-
-    public function setResponseCode($code)
-    {
-        http_response_code($code);
-    }
-
-    public function removeHeader($string)
-    {
-        header_remove($string);
-    }
-
-    public function setHeaderParam($key, $value)
-    {
-        $this->setHeader($key.': '.$value);
-    }
-
-    public function response($contents = null, $code = 200)
-    {
-        $this->setResponseCode($code);
-
-        if ($contents)
-            echo $contents;
-
-        Kernel::shutdown();
-    }
-   
-    
-    
-    
 }

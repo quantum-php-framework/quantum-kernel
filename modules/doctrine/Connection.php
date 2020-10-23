@@ -2,13 +2,13 @@
 
 namespace Quantum\Doctrine;
 
-use Doctrine\ORM\OptimisticLockException;
-use Doctrine\ORM\ORMException;
 use Quantum\Config;
 use Quantum\Doctrine;
 use Quantum\InternalPathResolver;
 use Quantum\Events\EventsManager;
 
+use Doctrine\ORM\OptimisticLockException;
+use Doctrine\ORM\ORMException;
 use Doctrine\ORM\Tools\Setup;
 use Doctrine\DBAL\DriverManager;
 use Doctrine\ORM\EntityManager;
