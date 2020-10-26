@@ -54,22 +54,38 @@ class Config extends Singleton
      */
     public function domainBasedAutoEnvConfig()
     {
+        $ipt = InternalPathResolver::getInstance();
 
-        $this->config_root = InternalPathResolver::getInstance()->config_root;
+        $this->config_root = $ipt->config_root;
 
-        $cfg_file = $this->config_root.'environment.php';
+        $requested_domain  = qs($_SERVER['HTTP_HOST'])->upToFirstOccurrenceOf(':');
+        $possible_env_file = qf($ipt->local_root.'environments/'.$requested_domain.'.json');
 
-        if (!is_file($cfg_file))
-            trigger_error("environment.php not found in config directory", E_USER_ERROR);
+        if ($possible_env_file->existsAsFile())
+        {
+            $env = \json_decode($possible_env_file->getContents());
 
-        require_once($cfg_file);
+            if ($env) {
+                $this->setEnvironment($env);
+                return;
+            }
+        }
+        else
+        {
+            $cfg_file = $this->config_root.'environment.php';
+
+            if (!is_file($cfg_file))
+                trigger_error("environment.php not found in config directory", E_USER_ERROR);
+
+            require_once($cfg_file);
+        }
 
         if (!isset($QUANTUM_ENVIRONMENTS))
             trigger_error("QUANTUM_ENVIRONMENTS are not set", E_USER_ERROR);
 
-        if (isset($_SERVER['SERVER_NAME']))
+        if (isset($_SERVER['HTTP_HOST']))
         {
-            $current_domain = $_SERVER['SERVER_NAME'];
+            $current_domain = $_SERVER['HTTP_HOST'];
 
             $current_env = '';
 
@@ -79,14 +95,13 @@ class Config extends Singleton
                 {
                     $current_env = (object)$environment;
                 }
-
             }
 
-            if (is_object($current_env)) {
+            if (!empty($current_env)) {
                 $this->setEnvironment($current_env);
             }
             else if (!Request::getInstance()->isCommandLine()) {
-                Output::getInstance()->displaySystemError('500');
+                Output::renderCriticalError(500);
             }
         }
 
