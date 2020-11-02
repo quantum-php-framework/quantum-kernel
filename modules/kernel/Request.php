@@ -60,10 +60,13 @@ class Request extends Singleton
      */
     function __construct()
     {
+        $_PUT = $this->isPut() ? $this->getRawInputParams() : [];
+
         $this->_RAW_POST = $_POST;
         $this->_RAW_GET = $_GET;
         $this->_RAW_REQUEST = $_REQUEST;
         $this->_RAW_COOKIE = $_COOKIE;
+        $this->_RAW_PUT = $_PUT;
 
         $this->_GET       = filter_input_array(INPUT_GET, FILTER_SANITIZE_STRING);
 
@@ -73,7 +76,9 @@ class Request extends Singleton
 
         $this->_SERVER    = filter_input_array(INPUT_SERVER, FILTER_SANITIZE_STRING);
 
-        $this->_REQUEST   = (array)$this->_POST  + (array)$this->_GET + (array)$this->_COOKIE;
+        $this->_PUT       = Security::trim($_PUT);
+
+        $this->_REQUEST   = (array)$this->_POST  + (array)$this->_GET + (array)$this->_COOKIE + (array)$this->_PUT;
 
         if (!empty($this->_GET))
             $this->_GET    = Security::trim($this->_GET);
@@ -82,12 +87,11 @@ class Request extends Singleton
             $this->_POST    = Security::trim($this->_POST);
 
         if (!empty($this->_COOKIE))
-            $this->_COOKIE    = Security::trim($this->_COOKIE);
+            $this->_COOKIE  = Security::trim($this->_COOKIE);
 
         $_GET = $this->_GET;
         $_POST = $this->_POST;
         $_COOKIE = $this->_COOKIE;
-
 
         $this->setRequestUrl();
     }
@@ -197,6 +201,19 @@ class Request extends Singleton
     /**
      * @param $paramName
      * @param bool $fallback
+     * @return bool
+     */
+    public function getPutParam($paramName, $fallback = false)
+    {
+        if ($this->hasPutParam($paramName))
+            return $this->_PUT[$paramName];
+
+        return $fallback;
+    }
+
+    /**
+     * @param $paramName
+     * @param bool $fallback
      * @return bool|mixed
      */
     public function getRequestParam($paramName, $fallback = false)
@@ -266,6 +283,14 @@ class Request extends Singleton
     }
 
     /**
+     * @return mixed
+     */
+    public function getRawPut()
+    {
+        return $this->_RAW_PUT;
+    }
+
+    /**
      * @param $paramName
      * @param bool $fallback
      * @return bool
@@ -309,6 +334,19 @@ class Request extends Singleton
      * @param bool $fallback
      * @return bool
      */
+    public function getRawPutParam($paramName, $fallback = false)
+    {
+        if ($this->hasRawPutParam($paramName))
+            return $this->_RAW_PUT[$paramName];
+
+        return $fallback;
+    }
+
+    /**
+     * @param $paramName
+     * @param bool $fallback
+     * @return bool
+     */
     public function getRawParam($paramName, $fallback = false)
     {
         if (has_key($paramName, $this->_RAW_REQUEST))
@@ -333,6 +371,9 @@ class Request extends Singleton
             $p = $this->getRequestParam($paramName);
 
         if (empty($p))
+            $p = $this->getPutParam($paramName);
+
+        if (empty($p))
             $p = $fallback;
 
         return $p;
@@ -355,7 +396,8 @@ class Request extends Singleton
     {
         if ($this->hasPostParam($key) ||
             $this->hasGetParam($key)  ||
-            $this->hasRequestParam($key))
+            $this->hasRequestParam($key) ||
+            $this->hasPutParam($key))
             return true;
 
         return false;
@@ -386,6 +428,15 @@ class Request extends Singleton
     public function hasPostParam($key)
     {
         return has_key($key, $this->_POST);
+    }
+
+    /**
+     * @param $key
+     * @return bool
+     */
+    public function hasPutParam($key)
+    {
+        return has_key($key, $this->_PUT);
     }
 
     /**
@@ -440,6 +491,15 @@ class Request extends Singleton
     public function hasRawCookieParam($key)
     {
         return has_key($key, $this->_RAW_COOKIE);
+    }
+
+    /**
+     * @param $key
+     * @return bool
+     */
+    public function hasRawPutParam($key)
+    {
+        return has_key($key, $this->_RAW_PUT);
     }
 
     /**
@@ -540,6 +600,20 @@ class Request extends Singleton
             return true;
 
         return false;
+    }
+
+
+    public function getRawInputParams()
+    {
+        parse_str(file_get_contents("php://input"), $_PUT);
+
+        foreach ($_PUT as $key => $value)
+        {
+
+            $_PUT[qs($key)->remove('amp;')->remove("'")->toStdString()] = $value;
+        }
+
+        return $_PUT;
     }
 
     /**
@@ -847,43 +921,28 @@ class Request extends Singleton
      */
     public static function getHeaders()
     {
-        $headers = '';
+        $headers = array();
 
-        if (function_exists("apache_request_headers"))
-        {
-            $headers = apache_request_headers();
-        }
-        else
-        {
-            $headers = array();
+        // CONTENT_* headers are not prefixed with HTTP_.
+        $additional = array(
+            'CONTENT_LENGTH' => true,
+            'CONTENT_MD5'    => true,
+            'CONTENT_TYPE'   => true,
+        );
 
-            $copy_server = array(
-                'CONTENT_TYPE'   => 'Content-Type',
-                'CONTENT_LENGTH' => 'Content-Length',
-                'CONTENT_MD5'    => 'Content-Md5',
-            );
+        $server = stripslashes_deep($_SERVER);
 
-            foreach ($_SERVER as $key => $value) {
-                if (substr($key, 0, 5) === 'HTTP_') {
-                    $key = substr($key, 5);
-                    if (!isset($copy_server[$key]) || !isset($_SERVER[$key])) {
-                        $key = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', $key))));
-                        $headers[$key] = $value;
-                    }
-                } elseif (isset($copy_server[$key])) {
-                    $headers[$copy_server[$key]] = $value;
-                }
-            }
-
-            if (!isset($headers['Authorization'])) {
-                if (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-                    $headers['Authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-                } elseif (isset($_SERVER['PHP_AUTH_USER'])) {
-                    $basic_pass = isset($_SERVER['PHP_AUTH_PW']) ? $_SERVER['PHP_AUTH_PW'] : '';
-                    $headers['Authorization'] = 'Basic ' . base64_encode($_SERVER['PHP_AUTH_USER'] . ':' . $basic_pass);
-                } elseif (isset($_SERVER['PHP_AUTH_DIGEST'])) {
-                    $headers['Authorization'] = $_SERVER['PHP_AUTH_DIGEST'];
-                }
+        foreach ( $server as $key => $value ) {
+            if ( strpos( $key, 'HTTP_' ) === 0 ) {
+                $headers[ substr( $key, 5 ) ] = $value;
+            } elseif ( 'REDIRECT_HTTP_AUTHORIZATION' === $key && empty( $server['HTTP_AUTHORIZATION'] ) ) {
+                /*
+                 * In some server configurations, the authorization header is passed in this alternate location.
+                 * Since it would not be passed in in both places we do not check for both headers and resolve.
+                 */
+                $headers['AUTHORIZATION'] = $value;
+            } elseif ( isset( $additional[ $key ] ) ) {
+                $headers[ $key ] = $value;
             }
         }
 

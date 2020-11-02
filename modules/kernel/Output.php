@@ -38,6 +38,14 @@ class Output extends Singleton
      * @var bool
      */
     private $shouldTrimWhiteSpace;
+    /**
+     * @var string
+     */
+    private $header_filename;
+    /**
+     * @var string
+     */
+    private $footer_filename;
 
     /**
      * Output constructor.
@@ -47,6 +55,9 @@ class Output extends Singleton
         $this->shouldRenderHeaderAndFooter = true;
         $this->shouldCompressOutput = false;
         $this->shouldTrimWhiteSpace = false;
+
+        $this->header_filename = 'header.tpl';
+        $this->footer_filename = 'footer.tpl';
         $this->initSmarty();
 
     }
@@ -95,7 +106,7 @@ class Output extends Singleton
      */
     public function renderView($view) {
 
-       $this->display($this->ipt->views_root.$view);
+        $this->display($this->ipt->views_root.$view);
     }
 
     /**
@@ -181,7 +192,7 @@ class Output extends Singleton
             return true;
         }
 
-            return false;
+        return false;
 
     }
 
@@ -254,6 +265,17 @@ class Output extends Singleton
     }
 
 
+    public function setHeaderFileName($filename)
+    {
+        $this->header_filename = $filename;
+    }
+
+    public function setFooterFileName($filename)
+    {
+        $this->footer_filename = $filename;
+    }
+
+
     /**
      *
      */
@@ -273,8 +295,8 @@ class Output extends Singleton
             $this->smarty->assign('current_views_dir', $this->getViewDirInCurrentTemplate()."/".$this->activeController->controller."/");
             $this->smarty->assign('cvd', $this->getViewDirInCurrentTemplate()."/".$this->activeController->controller."/");
 
-            $header = $this->activeController->template."/layout/header.tpl";
-            $footer = $this->activeController->template."/layout/footer.tpl";
+            $header = $this->activeController->template."/layout/".$this->header_filename;
+            $footer = $this->activeController->template."/layout/".$this->footer_filename;
 
             if ($this->activeController->renderFullTemplate)
             {
@@ -387,8 +409,8 @@ class Output extends Singleton
      */
     public function render() {
 
-       if ($this->activeController->autoRender == true) {
-           $this->renderFullTemplate();
+        if ($this->activeController->autoRender == true) {
+            $this->renderFullTemplate();
         }
 
 
@@ -590,7 +612,7 @@ class Output extends Singleton
         header("Pragma: no-cache");
 
         echo $json;
-        exit();
+        Kernel::shutdown();
     }
 
     /**
@@ -599,6 +621,14 @@ class Output extends Singleton
     public function json($json)
     {
         self::outputJson($json);
+    }
+
+    public function adaptable($data)
+    {
+        if (is_vt($data))
+            $data = $data->toStdArray();
+
+        ApiOutput::adaptableOutput($data);
     }
 
     /**

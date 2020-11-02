@@ -76,6 +76,11 @@ abstract class HostedApp
         $this->_activeController = $controller;
     }
 
+    function getActiveController()
+    {
+        return $this->_activeController;
+    }
+
     /**
      * @param $key
      * @param $value

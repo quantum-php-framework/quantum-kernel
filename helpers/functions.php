@@ -2806,7 +2806,20 @@ if (!function_exists('set_header'))
     }
 }
 
+if (!function_exists('qm_get_headers'))
+{
+    /**
+     * Get all HTTP header key/values as an associative array for the current request.
+     *
+     *
+     * @return array The HTTP header key/value pairs.
+     */
+    function qm_get_headers()
+    {
+        return \Quantum\Request::getHeaders();
+    }
 
+}
 
 if (!function_exists('apache_request_headers'))
 {
@@ -2818,38 +2831,7 @@ if (!function_exists('apache_request_headers'))
      */
     function apache_request_headers()
     {
-        $headers = array();
-
-        $copy_server = array(
-            'CONTENT_TYPE'   => 'Content-Type',
-            'CONTENT_LENGTH' => 'Content-Length',
-            'CONTENT_MD5'    => 'Content-Md5',
-        );
-
-        foreach ($_SERVER as $key => $value) {
-            if (substr($key, 0, 5) === 'HTTP_') {
-                $key = substr($key, 5);
-                if (!isset($copy_server[$key]) || !isset($_SERVER[$key])) {
-                    $key = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', $key))));
-                    $headers[$key] = $value;
-                }
-            } elseif (isset($copy_server[$key])) {
-                $headers[$copy_server[$key]] = $value;
-            }
-        }
-
-        if (!isset($headers['Authorization'])) {
-            if (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-                $headers['Authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-            } elseif (isset($_SERVER['PHP_AUTH_USER'])) {
-                $basic_pass = isset($_SERVER['PHP_AUTH_PW']) ? $_SERVER['PHP_AUTH_PW'] : '';
-                $headers['Authorization'] = 'Basic ' . base64_encode($_SERVER['PHP_AUTH_USER'] . ':' . $basic_pass);
-            } elseif (isset($_SERVER['PHP_AUTH_DIGEST'])) {
-                $headers['Authorization'] = $_SERVER['PHP_AUTH_DIGEST'];
-            }
-        }
-
-        return $headers;
+        return qm_get_headers();
     }
 
 }
@@ -6093,3 +6075,40 @@ if (!function_exists('qm_request')) {
         return Quantum\Request::getInstance();
     }
 }
+
+if (!function_exists('map_deep'))
+{
+    function map_deep( $value, $callback ) {
+        if ( is_array( $value ) ) {
+            foreach ( $value as $index => $item ) {
+                $value[ $index ] = map_deep( $item, $callback );
+            }
+        } elseif ( is_object( $value ) ) {
+            $object_vars = get_object_vars( $value );
+            foreach ( $object_vars as $property_name => $property_value ) {
+                $value->$property_name = map_deep( $property_value, $callback );
+            }
+        } else {
+            $value = call_user_func( $callback, $value );
+        }
+
+        return $value;
+    }
+}
+
+if (!function_exists('stripslashes_from_strings_only'))
+{
+    function stripslashes_from_strings_only($value)
+    {
+        return is_string($value) ? stripslashes($value) : $value;
+    }
+}
+
+
+if (!function_exists('stripslashes_deep'))
+{
+    function stripslashes_deep($value) {
+        return map_deep( $value, 'stripslashes_from_strings_only' );
+    }
+}
+

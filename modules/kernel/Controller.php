@@ -13,10 +13,6 @@ class Controller
 {
 
     /**
-     * @var Kernel
-     */
-    public $kernel;
-    /**
      * @var Config
      */
     public $config;

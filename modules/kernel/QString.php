@@ -130,7 +130,7 @@ class QString implements Countable, IteratorAggregate, ArrayAccess
     }
 
     /**
-     * Returns true if the string contains a single precission floating number
+     * Returns true if the string contains a single precision floating number
      * otherwise.
      *
      * @return bool s
@@ -141,7 +141,7 @@ class QString implements Countable, IteratorAggregate, ArrayAccess
     }
 
     /**
-     * Returns true if the string contains a double precission number
+     * Returns true if the string contains a double precision number
      * otherwise.
      *
      * @return bool s
@@ -2848,6 +2848,14 @@ class QString implements Countable, IteratorAggregate, ArrayAccess
     public function decodeJson()
     {
         return json_decode($this->text);
+    }
+
+    /**
+     * @return \StdObject
+     */
+    public function decodeBase64()
+    {
+        return static::create(base64_decode($this->text));
     }
 
         /**

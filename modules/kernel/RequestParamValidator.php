@@ -843,7 +843,11 @@ class RequestParamValidator
 
         $registry = RuntimeRegistry::getInstance();
 
-        $params = $request->_POST;
+        $params = $request->getPostParams();
+
+        if (!$params) {
+            return;
+        }
 
         foreach ($params as $key => $param)
         {

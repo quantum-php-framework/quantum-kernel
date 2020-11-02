@@ -113,10 +113,10 @@ class ControllerFactory
         $c->config_root = $ipt->config_root;
         $c->tmp_root = $ipt->tmp_root;
 
-        $c->version = $kernel->getVersion();
+        $c->kernel_version = $kernel->getVersion();
         $c->renderFullTemplate = true;
 
-        $c->kernel = $kernel;
+        //$c->kernel = $kernel;
         $c->output = $kernel->output;
         $c->request = $request;
         $c->session = $kernel->session;

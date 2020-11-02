@@ -325,7 +325,6 @@ class Config extends Singleton
     {
         //$routes = $this->getApprovedAppRoutes();
 
-
         $routes = RoutesRegistry::getInstance()->getRoutes();
 
         if (empty($routes))
@@ -728,13 +727,32 @@ class Config extends Singleton
      */
     private function checkForIdInUriAndTokenize($uri)
     {
-        $request = Request::getInstance();
+        $segments = qs($uri)->explode('/');
+        $segments = array_values(array_filter($segments, function($v) { return $v != ''; }));
 
-        $id = $request->findId();
+        foreach ($segments as $index => $segment)
+        {
+            if (qs($segment)->contains('?'))
+            {
+                $segment = qs($segment)->upToFirstOccurrenceOf('?')->toStdString();
+            }
 
-        $uri = qs($uri)->replace($id, '{id}');
+            if (qs($segment)->isUuid())
+            {
+                $segments[$index] = '{id}';
+            }
 
-        return $uri->toStdString();
+            if (qs($segment)->isNumber())
+            {
+                $segments[$index] = '{id}';
+            }
+        }
+
+        $uri = qs(implode('/', $segments))->ensureLeft('/')->toStdString();
+
+        return $uri;
+
+
     }
 
     /**
