@@ -820,6 +820,14 @@ class Request extends Singleton
         return $this->_POST;
     }
 
+    /**
+     * @return mixed
+     */
+    public function getGetParams()
+    {
+        return $this->_GET;
+    }
+
 
     /**
      * @return \Quantum\BrowserDetector

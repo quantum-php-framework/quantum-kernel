@@ -276,6 +276,45 @@ class Output extends Singleton
     }
 
 
+    private function getHeaderFile()
+    {
+        $header = $this->ipt->templates_root.$this->activeController->template."/layout/".$this->header_filename;
+
+        if (qf($header)->existsAsFile()) {
+            return $header;
+        }
+
+        if ($this->header_filename != 'header.tpl')
+        {
+            $header = $this->ipt->templates_root.$this->activeController->template."/layout/header.tpl";
+
+            if (qf($header)->existsAsFile()) {
+                return $header;
+            }
+        }
+
+        return null;
+    }
+
+    private function getFooterFile()
+    {
+        $footer = $this->ipt->templates_root.$this->activeController->template."/layout/".$this->footer_filename;
+
+        if (qf($footer)->existsAsFile()) {
+            return $footer;
+        }
+
+        if ($this->footer_filename != 'footer.tpl')
+        {
+            $footer = $this->ipt->templates_root.$this->activeController->template."/layout/footer.tpl";
+
+            if (qf($footer)->existsAsFile()) {
+                return $footer;
+            }
+        }
+
+        return null;
+    }
     /**
      *
      */
@@ -295,17 +334,14 @@ class Output extends Singleton
             $this->smarty->assign('current_views_dir', $this->getViewDirInCurrentTemplate()."/".$this->activeController->controller."/");
             $this->smarty->assign('cvd', $this->getViewDirInCurrentTemplate()."/".$this->activeController->controller."/");
 
-            $header = $this->activeController->template."/layout/".$this->header_filename;
-            $footer = $this->activeController->template."/layout/".$this->footer_filename;
+            $header = $this->getHeaderFile();
+            $footer = $this->getFooterFile();
 
             if ($this->activeController->renderFullTemplate)
             {
-                if ($this->shouldRenderHeaderAndFooter)
-                {
-                    if (qf($this->ipt->templates_root.$header)->existsAsFile())
-                        $this->display($this->ipt->templates_root.$header);
+                if ($this->shouldRenderHeaderAndFooter) {
+                    $this->display($header);
                 }
-
             }
 
             if (!empty($this->mainView))
@@ -343,18 +379,14 @@ class Output extends Singleton
 
             if ($this->activeController->renderFullTemplate)
             {
-                if ($this->shouldRenderHeaderAndFooter)
-                {
-                    if (qf($this->ipt->templates_root.$footer)->existsAsFile())
-                        $this->display($this->ipt->templates_root . $footer);
+                if ($this->shouldRenderHeaderAndFooter) {
+                    $this->display($footer);
                 }
-
             }
 
         }
 
-        elseif (!empty($this->mainView))
-        {
+        elseif (!empty($this->mainView)) {
             $this->display($this->getViewInCurrentTemplate($this->mainView));
         }
 
@@ -362,7 +394,6 @@ class Output extends Singleton
         {
             foreach($this->views as $view)
             {
-                //var_dump($this);
                 $this->display($this->getViewInCurrentTemplate($view));
             }
         }
@@ -736,6 +767,10 @@ class Output extends Singleton
         $location = $this->ipt->system_error_templates_root;
 
         $file = $location.$type.".tpl";
+
+        if (!qf($file)->existsAsFile()) {
+            throw_exception('system error view file not found:'.$file);
+        }
 
         $this->display($file);
 

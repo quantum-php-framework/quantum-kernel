@@ -243,6 +243,7 @@ class RequestParamValidator
         if (!$request->isPost())
         {
             $this->success = false;
+            $this->addErrorMessage('request_method', 'Invalid Request Method');
             return $this->success;
         }
 
@@ -259,10 +260,28 @@ class RequestParamValidator
         if (!$request->isGet())
         {
             $this->success = false;
+            $this->addErrorMessage('request_method', 'Invalid Request Method');
             return $this->success;
         }
 
         return $this->processValidations($request->getRawGet());
+    }
+
+    /**
+     * @return bool
+     */
+    public function validatePut()
+    {
+        $request = Request::getInstance();
+
+        if (!$request->isPut())
+        {
+            $this->success = false;
+            $this->addErrorMessage('request_method', 'Invalid Request Method');
+            return $this->success;
+        }
+
+        return $this->processValidations($request->getRawPut());
     }
 
     /**
